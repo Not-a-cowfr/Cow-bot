@@ -1,17 +1,20 @@
 import discord
 from discord import app_commands
 from discord.ext import commands
-from botSetup import bot
 
-from commands.submit import TypeSelectionView
-from commands.report import ReportReasonModal
-from commands.xprates import boosts, crops, FarmingRateOptions
-from commands.submit import TicketTypeSelectionView
-from utils.playerTracker import player_status, tracked_players, save_tracked_players
-from utils.permissionUtils import isMod
+from src.setup import bot
+from submit import TypeSelectionView
+from report import ReportReasonModal
+from xprates import boosts, crops, FarmingRateOptions
+from submit import TicketTypeSelectionView
+from src.utils.playerTracker import player_status, tracked_players, save_tracked_players
+from src.utils.permissionUtils import isMod
+from src.utils.accountUtils import loadData, saveData
+from src.utils.devUtils import wip
 
 import random
 import requests
+import time
 
 minecraft_username_api = "https://api.mojang.com/users/profiles/minecraft/{}"
 mod_roles='Not a cow', 'Admin', 'Moderator', 'Support Team'
@@ -29,7 +32,6 @@ def standalone_commands():
 
             modal = ReportReasonModal(report_message)
             await interaction.response.send_modal(modal)
-
 
     @bot.tree.context_menu(name="Report User")
     async def report_user(interaction: discord.Interaction, user: discord.User):
@@ -98,6 +100,24 @@ def standalone_commands():
         else:
             await interaction.response.send_message(f'You were not tracking {username}.')
 
+    @bot.tree.command(name='link', description='Link you minecraft account')
+    async def link(interaction: discord.Interaction, minecraft_username: str):
+        discord_id = str(interaction.user.id)
+        data = loadData('linkedAccounts.json')
+
+        data[discord_id] = minecraft_username
+        saveData('linkedAccounts.json', data)
+
+        await interaction.response.send_message(f'{interaction.user.mention}, your Minecraft username "{minecraft_username}" has been successfully linked!')
+
+    @bot.tree.command(name='cakes', description='See your active cake effects')
+    async def cakes(interaction: discord.Interaction):
+        await interaction.response.send_message(wip('command'))
+
+def bot_setup_commands():
+    @bot.tree.command(name='Mod Roles', description='Choose which roles to give access to mod commands')
+    async def modRoles(interaction: discord.Interaction):
+        await interaction.response.send_message(wip('command'))
 
 # command groups
 class XPRates(app_commands.Group):

@@ -1,8 +1,6 @@
-from dis import disco
-
 import discord
 
-from botSetup import bot
+from src.setup import bot
 
 import os
 import json

@@ -3,7 +3,7 @@ import os
 
 import discord
 from discord.ext import commands
-from botSetup import bot
+from setup import bot
 
 from commands.commands import standalone_commands, XPRates, Contribute, Ticket
 from utils.playerTracker import player_status

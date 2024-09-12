@@ -6,7 +6,7 @@ import time
 import aiohttp
 import json
 
-from botSetup import bot
+from src.setup import bot
 
 load_dotenv()
 hypixel_api_key = os.getenv('API_KEY')
