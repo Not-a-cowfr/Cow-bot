@@ -55,6 +55,10 @@ def standalone_commands():
         else:
             await interaction.response.send_message("moo", ephemeral=True)
 
+    @bot.tree.command(name="wiki")
+    async def wiki(interaction: discord.Interaction):
+        await interaction.response.send_message(f'Command under heavy devlopment :construction_site::man_construction_worker:', ephemeral=True)
+
     @bot.tree.command(name='track', description='Get notified when a player joins/leaves Hypixel')
     async def track(interaction: discord.Interaction, username: str):
         user_id = str(interaction.user.id)
