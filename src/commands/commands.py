@@ -13,26 +13,6 @@ from utils.permissionUtils import isMod
 
 import random
 import requests
-=======
-import random
-import time
->>>>>>> Stashed changes
-
-import discord
-import requests
-import os
-import json
-from discord import app_commands
-from setup import bot
-
-from src.commands.report import ReportReasonModal
-from src.commands.submit import SelectTicketType
-from src.commands.track import tracked_players
-from src.commands.xprates import boosts, crops
-from src.commands.link import get_linked_discord
-from src.utils.devUtils import wip
-from src.utils.jsonDataUtils import loadData, saveData
-from src.utils.permissionUtils import isMod, isCow
 
 mod_roles=['Not a cow', 'Admin', 'Moderator', 'Support Team']
 data_file = 'src/data/linked_users.json'
@@ -87,15 +67,7 @@ def standalone_commands():
         else:
             await interaction.response.send_message(f'{user.name} does not have a linked Minecraft account.', ephemeral=True)
 
-
-<<<<<<< Updated upstream
-=======
-    @bot.tree.command(name="wiki")
-    async def wiki(interaction: discord.Interaction):
-        await wip('command', interaction)
-
-
->>>>>>> Stashed changes
+    
     @bot.tree.command(name='track', description='Get notified when a player joins/leaves Hypixel')
     @app_commands.describe(username='Your Minecraft username')
     async def track(interaction: discord.Interaction, username: str):
@@ -189,21 +161,12 @@ def standalone_commands():
         else:
             await interaction.response.send_message('You do not have a linked Minecraft username.', ephemeral=True)
 
-<<<<<<< Updated upstream
-=======
-
-    @bot.tree.command(name='cakes', description='See your active cake effects')
-    async def cakes(interaction: discord.Interaction):
-        await wip('command', interaction)
-
-
     @bot.tree.command(name='ping', description='Check the bot\'s latency')
     async def ping(interaction: discord.Interaction):
         latency = round(bot.latency * 1000)
         await interaction.response.send_message(f'Pong! Latency is {latency}ms', ephemeral=True)
 
 
->>>>>>> Stashed changes
 
 # command groups
 class XPRates(app_commands.Group):
@@ -353,13 +316,3 @@ class Ticket(app_commands.Group):
 
         if interaction.channel:
             await interaction.response.send_message(f'Deleted {deleted_count} closed ticket(s).')
-
-
-class Setup(app_commands.Group):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-    @app_commands.command(name='moderators', description='Choose which roles to give access to mod commands')
-    async def modRoles(self, interaction: discord.Interaction, role: discord.Role):
-        await wip('command', interaction)
-        #await interaction.response.send_message(f'Role {role.name} has been set for moderators.', ephemeral=True)
