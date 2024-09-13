@@ -1,12 +1,11 @@
-import json
-import os
-
 import discord
 from discord.ext import commands
 from botSetup import bot
 
 from commands.commands import standalone_commands, XPRates, Contribute, Ticket
-from utils.playerTracker import player_status
+from src.commands.track import check_player_status
+
+import os
 
 bot_token = os.getenv('BOT_TOKEN')
 
@@ -25,7 +24,7 @@ async def on_ready():
     bot.tree.add_command(command_ticket)
 
     standalone_commands()
-    player_status_tracker = player_status()
+    check_player_status.start()
 
     try:
         # sync commands

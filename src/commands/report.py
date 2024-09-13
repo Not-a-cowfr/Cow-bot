@@ -12,4 +12,4 @@ class ReportReasonModal(discord.ui.Modal):
             content=f"{self.report_message.content}\n\n**Reason:**\n```{self.reason.value}```"
         )
 
-        await interaction.response.send_message("Your report has been submitted for review by moderatorsz.", ephemeral=True)
+        await interaction.response.send_message("Your report has been submitted for review", ephemeral=True)
