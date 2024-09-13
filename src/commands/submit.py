@@ -2,13 +2,18 @@ from dis import disco
 
 import discord
 
+<<<<<<< Updated upstream
 from botSetup import bot
+=======
+from setup import bot
+>>>>>>> Stashed changes
 
 import os
 import json
 
+id_file = 'src/data/ticket_ids.json'
 
-class TypeSelectionView(discord.ui.View):
+class SelectSuggestiontype(discord.ui.View):
     def __init__(self, user: discord.User):
         super().__init__()
         self.user = user
@@ -99,7 +104,7 @@ class SubmissionReview(discord.ui.View):
         )
 
     def generate_ticket_id(self):
-        id_file = 'ticket_ids.json'
+        global id_file
         if os.path.exists(id_file):
             with open(id_file, 'r') as f:
                 ticket_ids = json.load(f)
@@ -115,7 +120,7 @@ class SubmissionReview(discord.ui.View):
 
         return new_ticket_id
 
-class TicketTypeSelectionView(discord.ui.View):
+class SelectTicketType(discord.ui.View):
     def __init__(self, user: discord.User):
         super().__init__()
         self.user = user
@@ -156,14 +161,13 @@ class TicketTypeSelectionView(discord.ui.View):
                 }
             )
 
-            await self.user.send(f'Your ticket has been created: {channel.mention}')
             await interaction.response.send_message(f'Ticket created: {channel.mention}', ephemeral=True)
 
         except Exception as e:
             await interaction.response.send_message(f'Failed to create the ticket channel. Error: {e}', ephemeral=True)
 
     def generate_ticket_id(self, ticket_type: str):
-        id_file = 'ticket_ids.json'
+        global id_file
 
         if os.path.exists(id_file):
             with open(id_file, 'r') as f:
