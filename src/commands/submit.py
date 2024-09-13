@@ -1,12 +1,7 @@
 from dis import disco
-
 import discord
 
-<<<<<<< Updated upstream
 from botSetup import bot
-=======
-from setup import bot
->>>>>>> Stashed changes
 
 import os
 import json

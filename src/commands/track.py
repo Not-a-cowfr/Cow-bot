@@ -3,7 +3,7 @@ from dotenv import load_dotenv
 from discord.ext import tasks
 from discord.ui import Button, View
 
-from setup import bot
+from botSetup import bot
 from src.utils.jsonDataUtils import loadData, saveData
 
 import os

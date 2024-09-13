@@ -1,34 +1,14 @@
-<<<<<<< Updated upstream
-import discord
-from discord import app_commands
-from discord.ext import commands
-from botSetup import bot
-
-from commands.submit import TypeSelectionView
-from commands.report import ReportReasonModal
-from commands.xprates import boosts, crops, FarmingRateOptions
-from commands.submit import TicketTypeSelectionView
-from utils.playerTracker import player_status, tracked_players, save_tracked_players
-from utils.permissionUtils import isMod
-
-import random
-import requests
-=======
-import random
-import time
->>>>>>> Stashed changes
-
 import discord
 import requests
 import os
 import json
 from discord import app_commands
-from setup import bot
+from botSetup import bot
 
 from src.commands.report import ReportReasonModal
-from src.commands.submit import SelectTicketType
+from src.commands.submit import SelectTicketType, SelectSuggestiontype
 from src.commands.track import tracked_players
-from src.commands.xprates import boosts, crops
+from src.commands.xprates import boosts, crops, FarmingRateOptions
 from src.commands.link import get_linked_discord
 from src.utils.devUtils import wip
 from src.utils.jsonDataUtils import loadData, saveData
@@ -88,14 +68,6 @@ def standalone_commands():
             await interaction.response.send_message(f'{user.name} does not have a linked Minecraft account.', ephemeral=True)
 
 
-<<<<<<< Updated upstream
-=======
-    @bot.tree.command(name="wiki")
-    async def wiki(interaction: discord.Interaction):
-        await wip('command', interaction)
-
-
->>>>>>> Stashed changes
     @bot.tree.command(name='track', description='Get notified when a player joins/leaves Hypixel')
     @app_commands.describe(username='Your Minecraft username')
     async def track(interaction: discord.Interaction, username: str):
@@ -149,30 +121,35 @@ def standalone_commands():
 
         await interaction.response.send_message(f'Stopped tracking `{username}`')
 
-
     @bot.tree.command(name='link', description='Link your Discord ID with your Minecraft username')
     @app_commands.describe(username='Your Minecraft username')
     async def link(interaction: discord.Interaction, username: str):
         user_id = str(interaction.user.id)
-        global data_file
-        hypixel_api_key = os.getenv('API_KEY')
+        data_file = 'src/data/linked_users.json'
+        linked_users = loadData(data_file)
 
+        if user_id in linked_users:
+            await interaction.response.send_message(
+                'You have already linked your Discord ID with a Minecraft username.', ephemeral=True)
+            return
+
+        hypixel_api_key = os.getenv('API_KEY')
         linked_discord = get_linked_discord(username, hypixel_api_key)
         if linked_discord is None:
             await interaction.response.send_message(
-                'You haven\'t linked your discord to your hypixel account!')
+                'No linked Discord account found for the provided Minecraft username.', ephemeral=True)
             return
 
         if linked_discord != interaction.user.name:
-            await interaction.response.send_message('You do not have access to link this Minecraft username.')
+            await interaction.response.send_message('You do not have access to link this Minecraft username.',
+                                                    ephemeral=True)
             return
 
-        data = loadData(data_file)
-        data[user_id] = username
-        saveData(data_file, data)
+        linked_users[user_id] = username
+        saveData(data_file, linked_users)
 
         await interaction.response.send_message(
-            f'Your Discord ID has been linked with the Minecraft username: `{username}`')
+            f'Your Discord ID has been linked with the Minecraft username: `{username}`', ephemeral=True)
 
 
     @bot.tree.command(name='unlink', description='Unlink your Discord ID from your Minecraft username')
@@ -189,13 +166,6 @@ def standalone_commands():
         else:
             await interaction.response.send_message('You do not have a linked Minecraft username.', ephemeral=True)
 
-<<<<<<< Updated upstream
-=======
-
-    @bot.tree.command(name='cakes', description='See your active cake effects')
-    async def cakes(interaction: discord.Interaction):
-        await wip('command', interaction)
-
 
     @bot.tree.command(name='ping', description='Check the bot\'s latency')
     async def ping(interaction: discord.Interaction):
@@ -203,7 +173,6 @@ def standalone_commands():
         await interaction.response.send_message(f'Pong! Latency is {latency}ms', ephemeral=True)
 
 
->>>>>>> Stashed changes
 
 # command groups
 class XPRates(app_commands.Group):
@@ -235,7 +204,7 @@ class XPRates(app_commands.Group):
         ])
         embed.add_field(name='Crops', value=crops_list, inline=True)
         embed.add_field(name='XP per hour', value=xp_rates_list, inline=True)
-        await interaction.response.send_message(embed=embed, view=FarmingView(wisdom, bps))
+        await interaction.response.send_message(embed=embed, view=FarmingRateOptions(wisdom, bps))
 
 
 class Contribute(app_commands.Group):
@@ -250,7 +219,7 @@ class Contribute(app_commands.Group):
 
     @app_commands.command(name='submit', description='Submit a feature, improvement, fix, or other for the bot.')
     async def submit(self, interaction: discord.Interaction):
-        view = SyggestionTypeSelection(user=interaction.user)
+        view = SelectSuggestiontype(user=interaction.user)
         await interaction.response.send_message(
             'Please select the type of submission from the dropdown menu.',
             ephemeral=True,
@@ -347,19 +316,8 @@ class Ticket(app_commands.Group):
                 await channel.delete()
                 deleted_count += 1
             except Exception as e:
-                await interaction.response.send_message(f'Failed to delete channel {channel.name}. Error: {e}',
-                                                        ephemeral=True)
+                await interaction.response.send_message(f'Failed to delete channel {channel.name}. Error: {e}', ephemeral=True)
                 return
 
         if interaction.channel:
             await interaction.response.send_message(f'Deleted {deleted_count} closed ticket(s).')
-
-
-class Setup(app_commands.Group):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-    @app_commands.command(name='moderators', description='Choose which roles to give access to mod commands')
-    async def modRoles(self, interaction: discord.Interaction, role: discord.Role):
-        await wip('command', interaction)
-        #await interaction.response.send_message(f'Role {role.name} has been set for moderators.', ephemeral=True)
