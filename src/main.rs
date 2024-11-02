@@ -3,6 +3,7 @@
 // import commands
 #[path = "commands/checkPlayer.rs"]
 mod check_player;
+mod commands;
 
 use poise::serenity_prelude as serenity;
 use std::{

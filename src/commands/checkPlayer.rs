@@ -6,6 +6,8 @@ use serenity::all::{CreateEmbed, User};
 use serenity::json::Value;
 use std::collections::HashMap;
 
+use crate::commands::utils::{get_account_from_anything};
+
 // command(s)
 #[poise::command(slash_command, context_menu_command = "Get Linked Account")]
 pub async fn get_linked_account(
@@ -27,8 +29,8 @@ pub async fn get_linked_account(
     Ok(())
 }
 
-#[poise::command(slash_command, context_menu_command = "Check Player")]
-pub async fn check_player(
+#[poise::command(context_menu_command = "Check Player")]
+pub async fn check_player_context(
     ctx: Context<'_>,
     #[description = "Player to check"] user: User,
 ) -> Result<(), Error> {
@@ -57,6 +59,37 @@ pub async fn check_player(
     Ok(())
 }
 
+#[poise::command(slash_command)]
+pub async fn check_player(
+    ctx: Context<'_>,
+    #[description = "Player to check"] user: String,
+) -> Result<(), Error> {
+    ctx.defer().await?;
+
+    let api_key = &ctx.data().api_key;
+    let (uptime_history, avg_uptime) = get_uptime(api_key, &user).await?;
+
+    let mut uptime_hist = String::new();
+    if uptime_history.is_empty() {
+        uptime_hist.push_str("An error occurred");
+    } else {
+        for (date, uptime) in &uptime_history {
+            uptime_hist.push_str(&format!("{}: {}\n", date, uptime));
+        }
+        uptime_hist.push_str(&format!("**Average Uptime**: {}\n", avg_uptime));
+    }
+
+    let (username, _uuid) = get_account_from_anything(user).await?;
+    let embed = CreateEmbed::default()
+        .title(format!("Farming stats for **{}**", username))
+        .field("Uptime History", uptime_hist, false)
+        .colour(0xa10d0d);
+
+    ctx.send(CreateReply::default().embed(embed)).await?;
+    Ok(())
+}
+
+
 // Utils
 #[derive(Deserialize)]
 struct MojangResponse {
@@ -81,7 +114,7 @@ struct Member {
     expHistory: Option<Value>,
 }
 
-async fn get_mojang_info(player: String) -> Result<(String, String), Error> {
+pub async fn get_mojang_info(player: String) -> Result<(String, String), Error> {
     let url = if player.len() == 32 {
         format!("https://api.mojang.com/user/profile/{}", player)
     } else if player.len() <= 16 {
@@ -98,37 +131,11 @@ async fn get_mojang_info(player: String) -> Result<(String, String), Error> {
     Ok((mojang_info.name, mojang_info.id))
 }
 
-async fn get_linked_elite_account(discordid: String) -> Result<(String, String), Error> {
+pub async fn get_linked_elite_account(discordid: String) -> Result<(String, String), Error> {
     let url = format!("https://api.elitebot.dev/account/{discordid}");
     let response = reqwest::get(&url).await?;
     let mojang_info: MojangResponse = response.json().await?;
     Ok((mojang_info.name, mojang_info.id))
-}
-
-async fn get_account_from_anything(identifier: String) -> Result<(String, String), Error> {
-    let (uuid, username);
-    if (identifier.len() == 32) | (identifier.len() <= 16) {
-        // mojang uuid or username
-        let result = get_mojang_info(identifier.into()).await?;
-        username = result.0;
-        uuid = result.1;
-    } else if identifier
-        .replace(&['@', '<', '>'][..], "")
-        .trim()
-        .parse::<u64>()
-        .is_ok()
-    {
-        // discord id
-        let result = get_linked_elite_account(identifier.into()).await?;
-        username = result.0;
-        uuid = result.1;
-    } else {
-        return Err(Box::new(std::io::Error::new(
-            std::io::ErrorKind::InvalidInput,
-            "Invalid player name or UUID",
-        )));
-    }
-    Ok((username, uuid))
 }
 
 async fn get_uptime(
