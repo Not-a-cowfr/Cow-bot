@@ -8,10 +8,26 @@ Discord bot made for different miscellaneous skyblock utilities
 Features
 </h2>
 
-None! (for now)
-<!---
-- check player commands `/check <type>`
--->
+- Get a user's mojang info - `/get_linked_account`
+- Get a user's estimated hypixel uptime - `/check`
+
+<h2 align="center">
+Set up
+</h2>
+
+### Prerequisites
+- Git
+- Rust
+- msvc build tools
+  - You can also use this [gist](https://gist.github.com/mmozeiko/7f3162ec2988e81e56d5c4e22cde9977) if you just need the build tools for rust
+- Discord bot
+
+### Steps
+- Clone the repository
+- Add required environment variables
+  - `DISCORD_TOKEN` - Your discord bot's token
+  - `API_KEY` - Your hypixel api key
+- Run `cargo run` in the root directory
 
 <h2 align="center">
 Credits
