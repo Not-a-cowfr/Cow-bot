@@ -16,7 +16,6 @@ pub async fn get_mojang_info(
     let embed = CreateEmbed::default()
         .title(format!("Player information for **{username}**"))
         .description(format!("Username: **{username}**\nUUID: `{uuid}`"))
-        .footer(CreateEmbedFooter::new("Bot by Not a cow"))
         .colour(color);
 
     ctx.send(CreateReply::default().embed(embed)).await?;
