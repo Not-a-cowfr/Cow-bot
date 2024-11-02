@@ -6,9 +6,8 @@ mod check_player;
 
 use poise::serenity_prelude as serenity;
 use std::{
-    collections::HashMap,
     env::var,
-    sync::{Arc, Mutex},
+    sync::{Arc},
     time::Duration,
 };
 
@@ -18,7 +17,6 @@ type Context<'a> = poise::Context<'a, Data, Error>;
 
 // Custom user data passed to all command functions
 pub struct Data {
-    votes: Mutex<HashMap<String, u32>>,
     api_key: String,
 }
 
@@ -90,7 +88,6 @@ async fn main() {
                 println!("Logged in as {}", _ready.user.name);
                 poise::builtins::register_globally(ctx, &framework.options().commands).await?;
                 Ok(Data {
-                    votes: Mutex::new(HashMap::new()),
                     api_key,
                 })
             })

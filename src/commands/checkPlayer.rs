@@ -15,7 +15,7 @@ pub async fn get_linked_account(
     ctx.defer().await?;
     let (username, uuid) = get_account_from_anything(user.id.to_string()).await?;
 
-    let color = 0xa10d0d;
+    let color = 0xa10d0d; //TODO make settings file for this color maybe
     let embed = CreateEmbed::default()
         .title(format!("Player information for **{username}**"))
         .description(format!(
@@ -66,7 +66,6 @@ struct MojangResponse {
 
 #[derive(Deserialize)]
 struct GuildResponse {
-    success: bool,
     guild: Option<Guild>,
 }
 
@@ -76,6 +75,7 @@ struct Guild {
 }
 
 #[derive(Deserialize)]
+#[allow(non_snake_case)]
 struct Member {
     uuid: String,
     expHistory: Option<Value>,
@@ -135,7 +135,7 @@ async fn get_uptime(
     api_key: &str,
     identifier: &str,
 ) -> Result<(HashMap<String, String>, String), Box<dyn std::error::Error + Send + Sync>> {
-    let (username, uuid) = get_account_from_anything(identifier.to_string()).await?;
+    let (_username, uuid) = get_account_from_anything(identifier.to_string()).await?;
     let url = format!("https://api.hypixel.net/v2/guild?key={api_key}&player={uuid}");
     let response = reqwest::get(&url).await?;
     let guild_response: GuildResponse = response.json().await?;
