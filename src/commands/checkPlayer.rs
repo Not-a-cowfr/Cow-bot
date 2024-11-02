@@ -29,36 +29,6 @@ pub async fn get_linked_account(
     Ok(())
 }
 
-#[poise::command(context_menu_command = "Check Player")]
-pub async fn check_player_context(
-    ctx: Context<'_>,
-    #[description = "Player to check"] user: User,
-) -> Result<(), Error> {
-    ctx.defer().await?;
-
-    let player = user.id.to_string();
-    let api_key = &ctx.data().api_key;
-    let (uptime_history, avg_uptime) = get_uptime(api_key, &player).await?;
-
-    let mut uptime_hist = String::new();
-    if uptime_history.is_empty() {
-        uptime_hist.push_str("An error occurred");
-    } else {
-        for (date, uptime) in &uptime_history {
-            uptime_hist.push_str(&format!("{}: {}\n", date, uptime));
-        }
-        uptime_hist.push_str(&format!("**Average Uptime**: {}\n", avg_uptime));
-    }
-
-    let embed = CreateEmbed::default()
-        .title(format!("Farming stats for **{}**", user.name))
-        .field("Uptime History", uptime_hist, false)
-        .colour(0xa10d0d);
-
-    ctx.send(CreateReply::default().embed(embed)).await?;
-    Ok(())
-}
-
 #[poise::command(slash_command)]
 pub async fn check_player(
     ctx: Context<'_>,
