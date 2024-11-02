@@ -42,9 +42,9 @@ async fn main() {
     // FrameworkOptions contains all of poise's configuration option in one struct
     // Every option can be omitted to use its default value
     let options = poise::FrameworkOptions {
-        commands: vec![check_player::get_mojang_info()],                       // Register the commands
+        commands: vec![check_player::get_linked_account()],  // Register the commands
         prefix_options: poise::PrefixFrameworkOptions {
-            prefix: Some(";".into()),                                                       // The prefix for all commands
+            prefix: Some(";".into()), // The prefix for all commands
             edit_tracker: Some(Arc::new(poise::EditTracker::for_timespan(
                 Duration::from_secs(3600),
             ))),
