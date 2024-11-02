@@ -1,6 +1,8 @@
 #![warn(clippy::str_to_string)]
 
-mod commands;
+// import commands
+#[path = "commands/checkPlayer.rs"]
+mod check_player;
 
 use poise::serenity_prelude as serenity;
 use std::{
@@ -20,9 +22,6 @@ pub struct Data {
 }
 
 async fn on_error(error: poise::FrameworkError<'_, Data, Error>) {
-    // This is our custom error handler
-    // They are many errors that can occur, so we only handle the ones we want to customize
-    // and forward the rest to the default handler
     match error {
         poise::FrameworkError::Setup { error, .. } => panic!("Failed to start bot: {:?}", error),
         poise::FrameworkError::Command { error, ctx, .. } => {
@@ -43,7 +42,7 @@ async fn main() {
     // FrameworkOptions contains all of poise's configuration option in one struct
     // Every option can be omitted to use its default value
     let options = poise::FrameworkOptions {
-        commands: vec![commands::help()],
+        commands: vec![check_player::get_mojang_info()], // Register the commands
         prefix_options: poise::PrefixFrameworkOptions {
             prefix: Some(".".into()),
             edit_tracker: Some(Arc::new(poise::EditTracker::for_timespan(
@@ -102,8 +101,8 @@ async fn main() {
         .options(options)
         .build();
 
-    let token = var("BOT_TOKEN")
-        .expect("Missing `BOT_TOKEN` env var, see README for more information.");
+    let token =
+        var("BOT_TOKEN").expect("Missing `BOT_TOKEN` env var, see README for more information.");
     let intents =
         serenity::GatewayIntents::non_privileged() | serenity::GatewayIntents::MESSAGE_CONTENT;
 
