@@ -171,19 +171,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "bot"
-version = "0.1.0"
-dependencies = [
- "cc",
- "env_logger",
- "poise",
- "reqwest 0.12.9",
- "serde",
- "serenity",
- "tokio",
-]
-
-[[package]]
 name = "bumpalo"
 version = "3.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -298,6 +285,19 @@ name = "core-foundation-sys"
 version = "0.8.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "773648b94d0e5d620f64f280777445740e61fe701025087ec8b57f45c791888b"
+
+[[package]]
+name = "cow_bot"
+version = "0.1.0"
+dependencies = [
+ "cc",
+ "env_logger",
+ "poise",
+ "reqwest 0.12.9",
+ "serde",
+ "serenity",
+ "tokio",
+]
 
 [[package]]
 name = "cpufeatures"
