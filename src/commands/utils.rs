@@ -1,5 +1,5 @@
-use crate::{Error};
-use crate::commands::checkPlayer::{get_mojang_info, get_linked_elite_account};
+use crate::commands::checkPlayer::{get_linked_elite_account, get_mojang_info};
+use crate::Error;
 
 pub async fn get_account_from_anything(identifier: String) -> Result<(String, String), Error> {
     let (uuid, username);

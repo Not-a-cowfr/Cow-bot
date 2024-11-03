@@ -7,8 +7,7 @@ use serenity::json::Value;
 use std::collections::HashMap;
 use thousands::Separable;
 
-use crate::commands::utils::{get_account_from_anything};
-
+use crate::commands::utils::get_account_from_anything;
 
 lazy_static::lazy_static! {
     static ref CROP_EMOJI: HashMap<&'static str, &'static str> = {
@@ -26,7 +25,6 @@ lazy_static::lazy_static! {
         m
     };
 }
-
 
 // command(s)
 #[poise::command(slash_command, context_menu_command = "Get Linked Account")]
@@ -75,7 +73,13 @@ pub async fn check_player(
     let mut best_contests_str = String::new();
     for (crop, (collected, timestamp)) in best_contests {
         let emoji = CROP_EMOJI.get(crop.as_str()).unwrap_or(&"");
-        best_contests_str.push_str(&format!("{} {}: [`{}`](https://elitebot.dev/contests/{})\n ", emoji, crop, collected.separate_with_commas(), timestamp));
+        best_contests_str.push_str(&format!(
+            "{} {}: [`{}`](https://elitebot.dev/contests/{})\n ",
+            emoji,
+            crop,
+            collected.separate_with_commas(),
+            timestamp
+        ));
     }
 
     let embed = CreateEmbed::default()
@@ -87,7 +91,6 @@ pub async fn check_player(
     ctx.send(CreateReply::default().embed(embed)).await?;
     Ok(())
 }
-
 
 // Utils
 #[derive(Deserialize)]
@@ -187,7 +190,9 @@ async fn get_uptime(
     )))
 }
 
-pub async fn get_best_contests(user: String) -> Result<(HashMap<String, (i64, String)>, String, Option<String>), Error> {
+pub async fn get_best_contests(
+    user: String,
+) -> Result<(HashMap<String, (i64, String)>, String, Option<String>), Error> {
     let (username, uuid) = get_account_from_anything(user).await?;
 
     let url = format!("https://api.elitebot.dev/contests/{}", uuid);
@@ -209,10 +214,18 @@ pub async fn get_best_contests(user: String) -> Result<(HashMap<String, (i64, St
             }
             Ok((best_contests, username, None))
         } else {
-            Ok((HashMap::new(), username.clone(), Some(format!("{} has not participated in any contests", username))))
+            Ok((
+                HashMap::new(),
+                username.clone(),
+                Some(format!("{} has not participated in any contests", username)),
+            ))
         }
     } else {
         println!("Error getting best contests: {}", response.status());
-        Ok((HashMap::new(), String::new(), Some(format!("Error: {}", response.status()))))
+        Ok((
+            HashMap::new(),
+            String::new(),
+            Some(format!("Error: {}", response.status())),
+        ))
     }
 }

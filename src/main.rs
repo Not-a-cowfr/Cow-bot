@@ -6,11 +6,7 @@ mod check_player;
 mod commands;
 
 use poise::serenity_prelude as serenity;
-use std::{
-    env::var,
-    sync::{Arc},
-    time::Duration,
-};
+use std::{env::var, sync::Arc, time::Duration};
 
 // Types used by all command functions
 type Error = Box<dyn std::error::Error + Send + Sync>;
@@ -88,9 +84,7 @@ async fn main() {
             Box::pin(async move {
                 println!("Logged in as {}", _ready.user.name);
                 poise::builtins::register_globally(ctx, &framework.options().commands).await?;
-                Ok(Data {
-                    api_key,
-                })
+                Ok(Data { api_key })
             })
         })
         .options(options)
