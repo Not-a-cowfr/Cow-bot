@@ -74,7 +74,7 @@ pub async fn check_player(
     for (crop, (collected, timestamp)) in best_contests {
         let emoji = CROP_EMOJI.get(crop.as_str()).unwrap_or(&"");
         best_contests_str.push_str(&format!(
-            "{} {}: [`{}`](https://elitebot.dev/contests/{})\n ",
+            "{} {}: [`{}`](https://elitebot.dev/contest/{})\n ",
             emoji,
             crop,
             collected.separate_with_commas(),
