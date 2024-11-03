@@ -5,8 +5,28 @@ use serde::Deserialize;
 use serenity::all::{CreateEmbed, User};
 use serenity::json::Value;
 use std::collections::HashMap;
+use thousands::Separable;
 
 use crate::commands::utils::{get_account_from_anything};
+
+
+lazy_static::lazy_static! {
+    static ref CROP_EMOJI: HashMap<&'static str, &'static str> = {
+        let mut m = HashMap::new();
+        m.insert("Cactus", "<:cactus:1301456780035100723>");
+        m.insert("Carrot", "<:carrot:1301456796896202794>");
+        m.insert("Cocoa Beans", "<:cocoa:1301456811794366535>");
+        m.insert("Melon", "<:melon:1301456827807961108>");
+        m.insert("Mushroom", "<:mushroom:1301456848372629566>");
+        m.insert("Nether Wart", "<:netherwart:1301456868715270164>");
+        m.insert("Potato", "<:potato:1301456882006753301>");
+        m.insert("Pumpkin", "<:pumpkin:1301456896376569856>");
+        m.insert("Sugar Cane", "<:sugarcane:1301456914063818753>");
+        m.insert("Wheat", "<:wheat:1301456927900958762>");
+        m
+    };
+}
+
 
 // command(s)
 #[poise::command(slash_command, context_menu_command = "Get Linked Account")]
@@ -37,6 +57,7 @@ pub async fn check_player(
     ctx.defer().await?;
 
     let api_key = &ctx.data().api_key;
+
     let (uptime_history, avg_uptime) = get_uptime(api_key, &user).await?;
 
     let mut uptime_hist = String::new();
@@ -49,10 +70,18 @@ pub async fn check_player(
         uptime_hist.push_str(&format!("**Average Uptime**: {}\n", avg_uptime));
     }
 
-    let (username, _uuid) = get_account_from_anything(user).await?;
+    let (best_contests, username, _error_message) = get_best_contests(user.clone()).await?;
+
+    let mut best_contests_str = String::new();
+    for (crop, (collected, timestamp)) in best_contests {
+        let emoji = CROP_EMOJI.get(crop.as_str()).unwrap_or(&"");
+        best_contests_str.push_str(&format!("{} {}: [`{}`](https://elitebot.dev/contests/{})\n ", emoji, crop, collected.separate_with_commas(), timestamp));
+    }
+
     let embed = CreateEmbed::default()
         .title(format!("Farming stats for **{}**", username))
-        .field("Uptime History", uptime_hist, false)
+        .field("Uptime History", uptime_hist, true)
+        .field("Best Contests", best_contests_str, true)
         .colour(0xa10d0d);
 
     ctx.send(CreateReply::default().embed(embed)).await?;
@@ -82,6 +111,13 @@ struct Guild {
 struct Member {
     uuid: String,
     expHistory: Option<Value>,
+}
+
+#[derive(Deserialize)]
+struct Contest {
+    crop: String,
+    timestamp: i64,
+    collected: i64,
 }
 
 pub async fn get_mojang_info(player: String) -> Result<(String, String), Error> {
@@ -149,4 +185,34 @@ async fn get_uptime(
         std::io::ErrorKind::NotFound,
         "Player not found",
     )))
+}
+
+pub async fn get_best_contests(user: String) -> Result<(HashMap<String, (i64, String)>, String, Option<String>), Error> {
+    let (username, uuid) = get_account_from_anything(user).await?;
+
+    let url = format!("https://api.elitebot.dev/contests/{}", uuid);
+    let response = reqwest::get(&url).await?;
+
+    if response.status().is_success() {
+        let data: Vec<Contest> = response.json().await?;
+        let mut best_contests: HashMap<String, (i64, String)> = HashMap::new();
+
+        if !data.is_empty() {
+            for contest in data {
+                let crop = contest.crop;
+                let timestamp = contest.timestamp;
+                let collected = contest.collected;
+
+                if !best_contests.contains_key(&crop) || collected > best_contests[&crop].0 {
+                    best_contests.insert(crop, (collected, timestamp.to_string()));
+                }
+            }
+            Ok((best_contests, username, None))
+        } else {
+            Ok((HashMap::new(), username.clone(), Some(format!("{} has not participated in any contests", username))))
+        }
+    } else {
+        println!("Error getting best contests: {}", response.status());
+        Ok((HashMap::new(), String::new(), Some(format!("Error: {}", response.status()))))
+    }
 }
