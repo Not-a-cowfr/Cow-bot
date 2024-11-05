@@ -1,7 +1,7 @@
 use crate::{Context, Error};
 use poise::serenity_prelude as serenity;
 use poise::CreateReply;
-use serde::Deserialize;
+use serde::{Serialize, Deserialize};
 use serenity::all::{CreateEmbed, User};
 use serenity::json::Value;
 use std::collections::HashMap;
@@ -56,14 +56,18 @@ pub async fn check_player(
 
     let api_key = &ctx.data().api_key;
 
-    let (uptime_history, avg_uptime) = get_uptime(api_key, &user).await?;
-
     let mut uptime_hist = String::new();
-    if uptime_history.is_empty() {
-        uptime_hist.push_str("An error occurred");
-    } else {
+    let (uptime_history, avg_uptime) = match get_uptime(api_key, &user).await {
+        Ok(result) => result,
+        Err(e) => {
+            uptime_hist.push_str(&format!("{}\n", e));
+            (HashMap::new(), String::new())
+        }
+    };
+
+    if !uptime_history.is_empty() {
         for (date, uptime) in &uptime_history {
-            uptime_hist.push_str(&format!("{}: {}\n", date, uptime));
+            uptime_hist.push_str(&format!("`{}`: {}\n", date, uptime));
         }
         uptime_hist.push_str(&format!("**Average Uptime**: {}\n", avg_uptime));
     }
@@ -71,15 +75,18 @@ pub async fn check_player(
     let (best_contests, username, _error_message) = get_best_contests(user.clone()).await?;
 
     let mut best_contests_str = String::new();
-    for (crop, (collected, timestamp)) in best_contests {
-        let emoji = CROP_EMOJI.get(crop.as_str()).unwrap_or(&"");
-        best_contests_str.push_str(&format!(
-            "{} {}: [`{}`](https://elitebot.dev/contest/{})\n ",
-            emoji,
-            crop,
-            collected.separate_with_commas(),
-            timestamp
-        ));
+    if best_contests.is_empty() {
+        best_contests_str.push_str("No contests found");
+    } else {
+        for (crop, (collected, timestamp)) in best_contests {
+            let emoji = CROP_EMOJI.get(crop.as_str()).unwrap_or(&"");
+            best_contests_str.push_str(&format!(
+                "{} [`{}`](https://elitebot.dev/contest/{})\n ",
+                emoji,
+                collected.separate_with_commas(),
+                timestamp
+            ));
+        }
     }
 
     let embed = CreateEmbed::default()
@@ -97,30 +104,6 @@ pub async fn check_player(
 struct MojangResponse {
     id: String,
     name: String,
-}
-
-#[derive(Deserialize)]
-struct GuildResponse {
-    guild: Option<Guild>,
-}
-
-#[derive(Deserialize)]
-struct Guild {
-    members: Vec<Member>,
-}
-
-#[derive(Deserialize)]
-#[allow(non_snake_case)]
-struct Member {
-    uuid: String,
-    expHistory: Option<Value>,
-}
-
-#[derive(Deserialize)]
-struct Contest {
-    crop: String,
-    timestamp: i64,
-    collected: i64,
 }
 
 pub async fn get_mojang_info(player: String) -> Result<(String, String), Error> {
@@ -147,6 +130,24 @@ pub async fn get_linked_elite_account(discordid: String) -> Result<(String, Stri
     Ok((mojang_info.name, mojang_info.id))
 }
 
+#[derive(Deserialize)]
+struct GuildResponse {
+    guild: Option<Guild>,
+}
+
+#[derive(Deserialize)]
+struct Guild {
+    members: Vec<Member>,
+}
+
+#[derive(Deserialize)]
+#[allow(non_snake_case)]
+struct Member {
+    uuid: String,
+    expHistory: Option<Value>,
+}
+
+
 async fn get_uptime(
     api_key: &str,
     identifier: &str,
@@ -154,7 +155,8 @@ async fn get_uptime(
     let (_username, uuid) = get_account_from_anything(identifier.to_string()).await?;
     let url = format!("https://api.hypixel.net/v2/guild?key={api_key}&player={uuid}");
     let response = reqwest::get(&url).await?;
-    let guild_response: GuildResponse = response.json().await?;
+    let response_text = response.text().await?;
+    let guild_response: GuildResponse = serde_json::from_str(&response_text)?;
 
     if guild_response.guild.is_none() {
         return Err(Box::new(std::io::Error::new(
@@ -190,9 +192,28 @@ async fn get_uptime(
     )))
 }
 
+
+#[derive(Deserialize)]
+struct CropRecord {
+    record: Record,
+}
+
+#[derive(Deserialize)]
+struct Record {
+    crop: String,
+    collected: i32,
+}
+
+#[derive(Deserialize)]
+struct Contest {
+    crop: String,
+    timestamp: i32,
+    collected: i32,
+}
+
 pub async fn get_best_contests(
     user: String,
-) -> Result<(HashMap<String, (i64, String)>, String, Option<String>), Error> {
+) -> Result<(HashMap<String, (i32, String)>, String, Option<String>), Error> {
     let (username, uuid) = get_account_from_anything(user).await?;
 
     let url = format!("https://api.elitebot.dev/contests/{}", uuid);
@@ -200,7 +221,7 @@ pub async fn get_best_contests(
 
     if response.status().is_success() {
         let data: Vec<Contest> = response.json().await?;
-        let mut best_contests: HashMap<String, (i64, String)> = HashMap::new();
+        let mut best_contests: HashMap<String, (i32, String)> = HashMap::new();
 
         if !data.is_empty() {
             for contest in data {
