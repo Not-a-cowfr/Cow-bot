@@ -1,63 +1,55 @@
 use crate::{Context, Error};
 use poise::serenity_prelude as serenity;
 use poise::CreateReply;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize};
 use serenity::all::{CreateEmbed, User};
 use serenity::json::Value;
 use std::collections::HashMap;
-use thousands::Separable;
-
-use crate::commands::utils::get_account_from_anything;
-
-lazy_static::lazy_static! {
-    static ref CROP_EMOJI: HashMap<&'static str, &'static str> = {
-        let mut m = HashMap::new();
-        m.insert("Cactus", "<:cactus:1301456780035100723>");
-        m.insert("Carrot", "<:carrot:1301456796896202794>");
-        m.insert("Cocoa Beans", "<:cocoa:1301456811794366535>");
-        m.insert("Melon", "<:melon:1301456827807961108>");
-        m.insert("Mushroom", "<:mushroom:1301456848372629566>");
-        m.insert("Nether Wart", "<:netherwart:1301456868715270164>");
-        m.insert("Potato", "<:potato:1301456882006753301>");
-        m.insert("Pumpkin", "<:pumpkin:1301456896376569856>");
-        m.insert("Sugar Cane", "<:sugarcane:1301456914063818753>");
-        m.insert("Wheat", "<:wheat:1301456927900958762>");
-        m
-    };
-}
 
 // command(s)
-#[poise::command(slash_command, context_menu_command = "Get Linked Account")]
+#[poise::command(slash_command, context_menu_command = "Get Linked Account", ephemeral = true)]
 pub async fn get_linked_account(
     ctx: Context<'_>,
     #[description = "Discord profile to get linked account of"] user: User,
 ) -> Result<(), Error> {
-    ctx.defer().await?;
-    let (username, uuid) = get_account_from_anything(user.id.to_string()).await?;
+    let (username, uuid) = match get_account_from_anything(&user.id.to_string()).await {
+        Ok(result) => result,
+        Err(_e) => {
+            let embed = CreateEmbed::default()
+                .title("Error")
+                .description("No linked account found")
+                .colour(0xa10d0d);
+            ctx.send(CreateReply::default().embed(embed)).await?;
+            return Ok(());
+        }
+    };
 
-    let color = 0xa10d0d; //TODO make settings file for this color maybe
     let embed = CreateEmbed::default()
         .title(format!("Player information for **{username}**"))
         .description(format!(
-            "Username: **{username}**\nUUID: `{uuid}`\n\n<https://elitebot.dev/@{username}>"
+            "Username: **{username}**\nUUID: `{uuid}`\n\n<https://elitebot.dev/@{username}>\n\n<https://sky.shiiyu.moe/stats/{username}>"
         ))
-        .colour(color);
+        .colour(0xffb6c1);
 
     ctx.send(CreateReply::default().embed(embed)).await?;
     Ok(())
 }
 
 #[poise::command(slash_command)]
-pub async fn check_player(
+pub async fn uptime(
     ctx: Context<'_>,
-    #[description = "Player to check"] user: String,
+    #[description = "Username, UUID, or discord ID"] mut user: Option<String>,
 ) -> Result<(), Error> {
     ctx.defer().await?;
+
+    if user.is_none() {
+        user = Some(ctx.author().id.to_string());
+    }
 
     let api_key = &ctx.data().api_key;
 
     let mut uptime_hist = String::new();
-    let (uptime_history, avg_uptime) = match get_uptime(api_key, &user).await {
+    let (uptime_history, avg_uptime) = match get_uptime(api_key, user.as_deref()).await {
         Ok(result) => result,
         Err(e) => {
             uptime_hist.push_str(&format!("{}\n", e));
@@ -69,44 +61,64 @@ pub async fn check_player(
         for (date, uptime) in &uptime_history {
             uptime_hist.push_str(&format!("`{}`: {}\n", date, uptime));
         }
-        uptime_hist.push_str(&format!("**Average Uptime**: {}\n", avg_uptime));
+        uptime_hist.push_str(&format!("\n**Average Uptime**: {}\n", avg_uptime));
     }
 
-    let (best_contests, username, _error_message) = get_best_contests(user.clone()).await?;
-
-    let mut best_contests_str = String::new();
-    if best_contests.is_empty() {
-        best_contests_str.push_str("No contests found");
-    } else {
-        for (crop, (collected, timestamp)) in best_contests {
-            let emoji = CROP_EMOJI.get(crop.as_str()).unwrap_or(&"");
-            best_contests_str.push_str(&format!(
-                "{} [`{}`](https://elitebot.dev/contest/{})\n ",
-                emoji,
-                collected.separate_with_commas(),
-                timestamp
-            ));
+    let (username, _uuid) = match get_account_from_anything(user.as_deref().unwrap()).await {
+        Ok(result) => result,
+        Err(_e) => {
+            let embed = CreateEmbed::default()
+                .title("Error")
+                .description("Cannot find an account. Did you input a user mention?")
+                .colour(0xa10d0d);
+            ctx.send(CreateReply::default().embed(embed)).await?;
+            return Ok(());
         }
-    }
+    };
 
     let embed = CreateEmbed::default()
-        .title(format!("Farming stats for **{}**", username))
-        .field("Uptime History", uptime_hist, true)
-        .field("Best Contests", best_contests_str, true)
-        .colour(0xa10d0d);
+        .title(format!("Uptime for **{}**", username.clone()))
+        .field("Uptime History\n", uptime_hist, true)
+        .colour(0xffb6c1);
 
     ctx.send(CreateReply::default().embed(embed)).await?;
     Ok(())
 }
 
 // Utils
+async fn get_account_from_anything(identifier: &str) -> Result<(String, String), Error> {
+    let (uuid, username);
+    if identifier.len() == 32 || identifier.len() <= 16 {
+        // mojang uuid or username
+        let result = get_mojang_info(identifier.to_string()).await?;
+        username = result.0;
+        uuid = result.1;
+    } else if identifier
+        .replace(&['@', '<', '>'][..], "")
+        .trim()
+        .parse::<u64>()
+        .is_ok()
+    {
+        // discord id
+        let result = get_linked_elite_account(identifier.to_string()).await?;
+        username = result.0;
+        uuid = result.1;
+    } else {
+        return Err(Box::new(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "Invalid player name or UUID",
+        )));
+    }
+    Ok((username, uuid))
+}
+
 #[derive(Deserialize)]
 struct MojangResponse {
     id: String,
     name: String,
 }
 
-pub async fn get_mojang_info(player: String) -> Result<(String, String), Error> {
+async fn get_mojang_info(player: String) -> Result<(String, String), Error> {
     let url = if player.len() == 32 {
         format!("https://api.mojang.com/user/profile/{}", player)
     } else if player.len() <= 16 {
@@ -123,7 +135,7 @@ pub async fn get_mojang_info(player: String) -> Result<(String, String), Error> 
     Ok((mojang_info.name, mojang_info.id))
 }
 
-pub async fn get_linked_elite_account(discordid: String) -> Result<(String, String), Error> {
+async fn get_linked_elite_account(discordid: String) -> Result<(String, String), Error> {
     let url = format!("https://api.elitebot.dev/account/{discordid}");
     let response = reqwest::get(&url).await?;
     let mojang_info: MojangResponse = response.json().await?;
@@ -150,9 +162,9 @@ struct Member {
 
 async fn get_uptime(
     api_key: &str,
-    identifier: &str,
+    identifier: Option<&str>,
 ) -> Result<(HashMap<String, String>, String), Box<dyn std::error::Error + Send + Sync>> {
-    let (_username, uuid) = get_account_from_anything(identifier.to_string()).await?;
+    let (_username, uuid) = get_account_from_anything(identifier.unwrap()).await?;
     let url = format!("https://api.hypixel.net/v2/guild?key={api_key}&player={uuid}");
     let response = reqwest::get(&url).await?;
     let response_text = response.text().await?;
@@ -190,63 +202,4 @@ async fn get_uptime(
         std::io::ErrorKind::NotFound,
         "Player not found",
     )))
-}
-
-
-#[derive(Deserialize)]
-struct CropRecord {
-    record: Record,
-}
-
-#[derive(Deserialize)]
-struct Record {
-    crop: String,
-    collected: i32,
-}
-
-#[derive(Deserialize)]
-struct Contest {
-    crop: String,
-    timestamp: i32,
-    collected: i32,
-}
-
-pub async fn get_best_contests(
-    user: String,
-) -> Result<(HashMap<String, (i32, String)>, String, Option<String>), Error> {
-    let (username, uuid) = get_account_from_anything(user).await?;
-
-    let url = format!("https://api.elitebot.dev/contests/{}", uuid);
-    let response = reqwest::get(&url).await?;
-
-    if response.status().is_success() {
-        let data: Vec<Contest> = response.json().await?;
-        let mut best_contests: HashMap<String, (i32, String)> = HashMap::new();
-
-        if !data.is_empty() {
-            for contest in data {
-                let crop = contest.crop;
-                let timestamp = contest.timestamp;
-                let collected = contest.collected;
-
-                if !best_contests.contains_key(&crop) || collected > best_contests[&crop].0 {
-                    best_contests.insert(crop, (collected, timestamp.to_string()));
-                }
-            }
-            Ok((best_contests, username, None))
-        } else {
-            Ok((
-                HashMap::new(),
-                username.clone(),
-                Some(format!("{} has not participated in any contests", username)),
-            ))
-        }
-    } else {
-        println!("Error getting best contests: {}", response.status());
-        Ok((
-            HashMap::new(),
-            String::new(),
-            Some(format!("Error: {}", response.status())),
-        ))
-    }
 }
