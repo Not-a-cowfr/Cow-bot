@@ -1,7 +1,7 @@
 #![warn(clippy::str_to_string)]
 
 // import commands
-#[path = "commands/checkPlayer.rs"]
+#[path = "commands/uptime.rs"]
 mod check_player;
 
 use poise::serenity_prelude as serenity;
