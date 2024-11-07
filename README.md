@@ -9,7 +9,8 @@ Features
 </h2>
 
 - Get a user's mojang info - `/get_linked_account`
-- Get a user's estimated hypixel uptime - `/check`
+- Get a user's estimated hypixel uptime - `/uptime`
+- Set your custom color for the bot - `/color`
 
 <h2 align="center">
 Set up
