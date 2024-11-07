@@ -1,9 +1,8 @@
 #![warn(clippy::str_to_string)]
 
 // import commands
-#[path = "commands/checkPlayer.rs"]
+#[path = "commands/uptime.rs"]
 mod check_player;
-mod commands;
 
 use poise::serenity_prelude as serenity;
 use std::{env::var, sync::Arc, time::Duration};
@@ -40,7 +39,7 @@ async fn main() {
     let options = poise::FrameworkOptions {
         commands: vec![
             check_player::get_linked_account(),
-            check_player::check_player(),
+            check_player::uptime(),
         ],
         prefix_options: poise::PrefixFrameworkOptions {
             prefix: Some(";".into()),

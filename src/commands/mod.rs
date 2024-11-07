@@ -1,3 +1,2 @@
 #[allow(non_snake_case)]
-pub mod checkPlayer;
 pub mod utils;
