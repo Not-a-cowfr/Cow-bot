@@ -19,14 +19,23 @@ Set up
 - Git
 - Rust
 - msvc build tools
+<<<<<<< HEAD
+    - You can also use this [gist](https://gist.github.com/mmozeiko/7f3162ec2988e81e56d5c4e22cde9977) if you just need the build tools for rust
+=======
   - You can also use this [gist](https://gist.github.com/mmozeiko/7f3162ec2988e81e56d5c4e22cde9977) if you just need the build tools for rust
+>>>>>>> parent of 80af730 (Merge pull request #3 from Not-a-cowfr/uptime-only)
 - Discord bot
 
 ### Steps
 - Clone the repository
 - Add required environment variables
+<<<<<<< HEAD
+    - `DISCORD_TOKEN` - Your discord bot's token
+    - `API_KEY` - Your hypixel api key
+=======
   - `DISCORD_TOKEN` - Your discord bot's token
   - `API_KEY` - Your hypixel api key
+>>>>>>> parent of 80af730 (Merge pull request #3 from Not-a-cowfr/uptime-only)
 - Run `cargo run` in the root directory
 
 <h2 align="center">
