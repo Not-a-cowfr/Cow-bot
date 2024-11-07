@@ -1,15 +1,25 @@
 #![warn(clippy::str_to_string)]
 
-// import commands
 #[path = "commands/uptime.rs"]
-mod check_player;
+mod uptime;
+
+#[path = "commands/color.rs"]
+mod color;
+
+#[path = "data/database.rs"]
+mod database;
+mod commands;
 
 use poise::serenity_prelude as serenity;
 use std::{env::var, sync::Arc, time::Duration};
+use database::create_users_table;
 
-// Types used by all command functions
-type Error = Box<dyn std::error::Error + Send + Sync>;
-type Context<'a> = poise::Context<'a, Data, Error>;
+mod types {
+    pub type Error = Box<dyn std::error::Error + Send + Sync>;
+    pub type Context<'a> = poise::Context<'a, super::Data, Error>;
+}
+
+use types::{Error, Context};
 
 // Custom user data passed to all command functions
 pub struct Data {
@@ -20,7 +30,7 @@ async fn on_error(error: poise::FrameworkError<'_, Data, Error>) {
     match error {
         poise::FrameworkError::Setup { error, .. } => panic!("Failed to start bot: {:?}", error),
         poise::FrameworkError::Command { error, ctx, .. } => {
-            println!("[ERROR] in command '{}': {:?}", ctx.command().name, error,);
+            println!("[ERROR] in command '{}': {:?}", ctx.command().name, error);
         }
         error => {
             if let Err(e) = poise::builtins::on_error(error).await {
@@ -38,8 +48,9 @@ async fn main() {
 
     let options = poise::FrameworkOptions {
         commands: vec![
-            check_player::get_linked_account(),
-            check_player::uptime(),
+            uptime::get_linked_account(),
+            uptime::uptime(),
+            color::color()
         ],
         prefix_options: poise::PrefixFrameworkOptions {
             prefix: Some(";".into()),
@@ -88,6 +99,8 @@ async fn main() {
         })
         .options(options)
         .build();
+
+    create_users_table().expect("[ERROR] Failed to create database \'users\'");
 
     let token = var("BOT_TOKEN").expect(
         "[ERROR] Missing `BOT_TOKEN` env var, please include this in the environment variables",

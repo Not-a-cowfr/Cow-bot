@@ -6,7 +6,8 @@ use serenity::all::{CreateEmbed, User};
 use serenity::json::Value;
 use std::collections::HashMap;
 
-// command(s)
+use crate::commands::utils::{get_account_from_anything, get_color};
+
 #[poise::command(slash_command, context_menu_command = "Get Linked Account", ephemeral = true)]
 pub async fn get_linked_account(
     ctx: Context<'_>,
@@ -24,12 +25,20 @@ pub async fn get_linked_account(
         }
     };
 
+    let author = ctx.author();
+    let color_result = get_color(&author.name);
+
+    let color_value = match color_result {
+        Ok(Some(color_str)) => u32::from_str_radix(&color_str.replace("0x", ""), 16).unwrap_or(0x383838),
+        _ => 0x383838, // default color if there's an error or no color found
+    };
+
     let embed = CreateEmbed::default()
         .title(format!("Player information for **{username}**"))
         .description(format!(
             "Username: **{username}**\nUUID: `{uuid}`\n\n<https://elitebot.dev/@{username}>\n\n<https://sky.shiiyu.moe/stats/{username}>"
         ))
-        .colour(0xffb6c1);
+        .colour(color_value);
 
     ctx.send(CreateReply::default().embed(embed)).await?;
     Ok(())
@@ -76,71 +85,23 @@ pub async fn uptime(
         }
     };
 
+    let author = ctx.author();
+    let color_result = get_color(&author.name);
+
+    let color_value = match color_result {
+        Ok(Some(color_str)) => u32::from_str_radix(&color_str.replace("0x", ""), 16).unwrap_or(0x383838),
+        _ => 0x383838, // default color if there's an error or no color found
+    };
+
     let embed = CreateEmbed::default()
         .title(format!("Uptime for **{}**", username.clone()))
         .field("Uptime History\n", uptime_hist, true)
-        .colour(0xffb6c1);
+        .colour(color_value);
 
     ctx.send(CreateReply::default().embed(embed)).await?;
     Ok(())
 }
 
-// Utils
-async fn get_account_from_anything(identifier: &str) -> Result<(String, String), Error> {
-    let (uuid, username);
-    if identifier.len() == 32 || identifier.len() <= 16 {
-        // mojang uuid or username
-        let result = get_mojang_info(identifier.to_string()).await?;
-        username = result.0;
-        uuid = result.1;
-    } else if identifier
-        .replace(&['@', '<', '>'][..], "")
-        .trim()
-        .parse::<u64>()
-        .is_ok()
-    {
-        // discord id
-        let result = get_linked_elite_account(identifier.to_string()).await?;
-        username = result.0;
-        uuid = result.1;
-    } else {
-        return Err(Box::new(std::io::Error::new(
-            std::io::ErrorKind::InvalidInput,
-            "Invalid player name or UUID",
-        )));
-    }
-    Ok((username, uuid))
-}
-
-#[derive(Deserialize)]
-struct MojangResponse {
-    id: String,
-    name: String,
-}
-
-async fn get_mojang_info(player: String) -> Result<(String, String), Error> {
-    let url = if player.len() == 32 {
-        format!("https://api.mojang.com/user/profile/{}", player)
-    } else if player.len() <= 16 {
-        format!("https://api.mojang.com/users/profiles/minecraft/{}", player)
-    } else {
-        return Err(Box::new(std::io::Error::new(
-            std::io::ErrorKind::InvalidInput,
-            "Invalid player name or UUID",
-        )));
-    };
-
-    let response = reqwest::get(&url).await?;
-    let mojang_info: MojangResponse = response.json().await?;
-    Ok((mojang_info.name, mojang_info.id))
-}
-
-async fn get_linked_elite_account(discordid: String) -> Result<(String, String), Error> {
-    let url = format!("https://api.elitebot.dev/account/{discordid}");
-    let response = reqwest::get(&url).await?;
-    let mojang_info: MojangResponse = response.json().await?;
-    Ok((mojang_info.name, mojang_info.id))
-}
 
 #[derive(Deserialize)]
 struct GuildResponse {
