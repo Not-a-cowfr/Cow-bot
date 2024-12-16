@@ -1,63 +1,54 @@
-name: Rust CI
-
-on: [ push, pull_request ]
+on:
+  push:
+    paths:
+      - '**/*.rs'
+      - '**/*.toml'
+      - '**/*.yml'
 
 jobs:
-  fmt:
+  rustfmt:
     name: Rustfmt
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/cache@v3
-        with:
-          path: ~/.cargo
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          override: true
-      - run: rustup component add rustfmt
-      - run: cargo fmt --all -- --check
+      - name: Install nightly
+        run: rustup install nightly
+      - name: Install Rustfmt
+        run: rustup component add rustfmt --toolchain nightly
+      - name: Cargo fmt
+        run: cargo +nightly fmt --all
 
   clippy:
-    name: Clippy
+    name: Lint Code
+    needs: rustfmt
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/cache@v3
-        with:
-          path: ~/.cargo
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          override: true
-      - run: rustup component add clippy
-      - run: cargo clippy --all-features -- -D warnings
+      - name: Install nightly
+        run: rustup install nightly
+      - name: Install Clippy
+        run: rustup component add clippy --toolchain nightly
+      - name: Run Clippy
+        run: cargo +nightly clippy --workspace --all-targets --message-format=json -- -D warnings | tee clippy.json
 
   build:
     name: Build
+    needs: [ rustfmt, clippy ]
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        toolchain: [ stable, beta, nightly ]
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/cache@v3
-        with:
-          path: ~/.cargo
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: ${{ matrix.toolchain }}
-          override: true
-      - run: cargo build --all
+      - name: Install nightly
+        run: rustup install nightly
+      - name: Cargo build
+        run: cargo +nightly build --workspace --release
+
+  tests:
+    name: Tests
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install nightly
+        run: rustup install nightly
+      - name: Cargo test
+        run: cargo +nightly test --workspace --release

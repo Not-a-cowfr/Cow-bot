@@ -1,0 +1,13 @@
+edition = "2021"
+style_edition = '2024'
+
+fn_params_layout = 'Vertical'
+fn_single_line = true
+hard_tabs = true
+hex_literal_case = 'Lower'
+imports_layout = 'HorizontalVertical'
+match_arm_leading_pipes = 'Always'
+match_block_trailing_comma = true
+imports_granularity = 'Module'
+group_imports = 'StdExternalCrate'
+struct_field_align_threshold = 10
