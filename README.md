@@ -25,7 +25,7 @@ Set up
 - [Hypixel api key](https://developer.hypixel.net/)
 
 ### Steps
-- Clone the repository
+- Clone the repository `git clone https://github.com/Not-a-cowfr/Cow-bot`
 - Add required environment variables
   - `DISCORD_TOKEN` - Your discord bot's token
   - `API_KEY` - Your hypixel api key
