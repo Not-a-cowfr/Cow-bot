@@ -82,6 +82,15 @@ pub async fn get_mojang_info(player: String) -> Result<(String, String), Error> 
 pub async fn get_linked_elite_account(discordid: String) -> Result<(String, String), Error> {
 	let url = format!("https://api.elitebot.dev/account/{discordid}");
 	let response = reqwest::get(&url).await?;
-	let mojang_info: MojangResponse = response.json().await?;
+	let response_text = response.text().await?;
+
+	if response_text == "Minecraft account not found." {
+		return Err(Box::new(std::io::Error::new(
+			std::io::ErrorKind::NotFound,
+			"No linked account found!",
+		)));
+	}
+
+	let mojang_info: MojangResponse = serde_json::from_str(&response_text)?;
 	Ok((mojang_info.name, mojang_info.id))
 }
