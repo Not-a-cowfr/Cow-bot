@@ -1,6 +1,6 @@
 use poise::{CreateReply, serenity_prelude as serenity};
 use rusqlite::{Connection, params};
-use serenity::all::{CreateEmbed, User};
+use serenity::all::CreateEmbed;
 
 use crate::{Context, Error};
 

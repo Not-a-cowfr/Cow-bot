@@ -17,18 +17,22 @@ Set up
 </h2>
 
 ### Prerequisites
+
 - Git
 - Rust
 - [msvc build tools](https://visualstudio.microsoft.com/downloads/?q=build+tools)
-  - You can also use this [gist](https://gist.github.com/mmozeiko/7f3162ec2988e81e56d5c4e22cde9977) if you just need the build tools for rust
+    - You can also use this [gist](https://gist.github.com/mmozeiko/7f3162ec2988e81e56d5c4e22cde9977) if you just need
+      the build tools for rust
+- sqlite3
 - A Discord bot
 - [Hypixel api key](https://developer.hypixel.net/)
 
 ### Steps
+
 - Clone the repository `git clone https://github.com/Not-a-cowfr/Cow-bot`
 - Add required environment variables
-  - `DISCORD_TOKEN` - Your discord bot's token
-  - `API_KEY` - Your hypixel api key
+    - `DISCORD_TOKEN` - Your discord bot's token
+    - `API_KEY` - Your hypixel api key
 - Run `cargo run` in the root directory
 
 <h2 align="center">

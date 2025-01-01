@@ -50,19 +50,12 @@ pub async fn uptime(
 	};
 
 	let author = ctx.author();
-	let color_result = get_color(&author.name);
-
-	let color_value = match color_result {
-		| Ok(Some(color_str)) => {
-			u32::from_str_radix(&color_str.replace("0x", ""), 16).unwrap_or(0x383838)
-		},
-		| _ => 0x383838, // default color if there's an error or no color found
-	};
+	let color = get_color(&author.name);
 
 	let embed = CreateEmbed::default()
 		.title(format!("Uptime for **{}**", username.clone()))
 		.field("Uptime History\n", uptime_hist, true)
-		.colour(color_value);
+		.colour(color);
 
 	ctx.send(CreateReply::default().embed(embed)).await?;
 	Ok(())
