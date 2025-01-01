@@ -41,7 +41,9 @@ pub async fn get_account_from_anything(identifier: &str) -> Result<(String, Stri
 		.is_ok()
 	{
 		// discord id
-		let result = get_linked_elite_account(identifier.to_string()).await?;
+		let result =
+			get_linked_elite_account(identifier.replace(&['@', '<', '>'][..], "").to_string())
+				.await?;
 		username = result.0;
 		uuid = result.1;
 	} else {
