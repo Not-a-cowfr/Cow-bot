@@ -1,4 +1,4 @@
-use rusqlite::{params, Connection, Result};
+use rusqlite::{Connection, Result, params};
 use serde::Deserialize;
 
 use crate::types::Error;
@@ -57,7 +57,7 @@ pub async fn get_account_from_anything(identifier: &str) -> Result<(String, Stri
 
 #[derive(Deserialize)]
 struct MojangResponse {
-	id: String,
+	id:   String,
 	name: String,
 }
 
@@ -75,10 +75,25 @@ pub async fn get_mojang_info(player: String) -> Result<(String, String), Error> 
 	};
 
 	let response = reqwest::get(&url).await?;
-	let mojang_info: MojangResponse = response.json().await?;
+	let response_text = response.text().await?;
+
+	if response_text.contains("errorMessage") {
+		if response_text.contains("CONSTRAINT_VIOLATION") {
+			return Err(Box::new(std::io::Error::new(
+				std::io::ErrorKind::InvalidInput,
+				"Invalid UUID string",
+			)));
+		} else {
+			return Err(Box::new(std::io::Error::new(
+				std::io::ErrorKind::NotFound,
+				format!("Player \"{}\" does not exist", player),
+			)));
+		}
+	}
+
+	let mojang_info: MojangResponse = serde_json::from_str(&response_text)?;
 	Ok((mojang_info.name, mojang_info.id))
 }
-
 pub async fn get_linked_elite_account(discordid: String) -> Result<(String, String), Error> {
 	let url = format!("https://api.elitebot.dev/account/{discordid}");
 	let response = reqwest::get(&url).await?;
