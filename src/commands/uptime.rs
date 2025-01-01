@@ -2,53 +2,11 @@ use std::collections::HashMap;
 
 use poise::{CreateReply, serenity_prelude as serenity};
 use serde::Deserialize;
-use serenity::all::{CreateEmbed, User};
+use serenity::all::CreateEmbed;
 use serenity::json::Value;
 
 use crate::commands::utils::{get_account_from_anything, get_color};
 use crate::{Context, Error};
-
-#[poise::command(
-	slash_command,
-	context_menu_command = "Get Linked Account",
-	ephemeral = true
-)]
-pub async fn get_linked_account(
-	ctx: Context<'_>,
-	#[description = "Discord profile to get linked account of"] user: User,
-) -> Result<(), Error> {
-	let (username, uuid) = match get_account_from_anything(&user.id.to_string()).await {
-		| Ok(result) => result,
-		| Err(_e) => {
-			let embed = CreateEmbed::default()
-				.title("Error")
-				.description("No linked account found")
-				.colour(0xa10d0d);
-			ctx.send(CreateReply::default().embed(embed)).await?;
-			return Ok(());
-		},
-	};
-
-	let author = ctx.author();
-	let color_result = get_color(&author.name);
-
-	let color_value = match color_result {
-		| Ok(Some(color_str)) => {
-			u32::from_str_radix(&color_str.replace("0x", ""), 16).unwrap_or(0x383838)
-		},
-		| _ => 0x383838, // default color if there's an error or no color found
-	};
-
-	let embed = CreateEmbed::default()
-        .title(format!("Player information for **{username}**"))
-        .description(format!(
-            "Username: **{username}**\nUUID: `{uuid}`\n\n<https://elitebot.dev/@{username}>\n\n<https://sky.shiiyu.moe/stats/{username}>"
-        ))
-        .colour(color_value);
-
-	ctx.send(CreateReply::default().embed(embed)).await?;
-	Ok(())
-}
 
 #[poise::command(slash_command)]
 pub async fn uptime(
