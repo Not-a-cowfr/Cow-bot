@@ -78,6 +78,10 @@ struct Member {
 	expHistory: Option<Value>,
 }
 
+pub fn gexp_to_uptime_as_string(gexp: i64) -> String {
+	format!("{}h {}m", gexp / 7 / 9000, (gexp / 7 % 9000) / 150)
+}
+
 async fn get_uptime(
 	api_key: &str,
 	identifier: Option<&str>,
@@ -106,12 +110,12 @@ async fn get_uptime(
 						format!("{}/{}/{}", &date[8..10], &date[5..7], &date[2..4]);
 					let xp_value = xp.as_i64().unwrap();
 					total_xp += xp_value;
-					let formatted_xp = format!("{}h {}m", xp_value / 9000, (xp_value % 9000) / 150);
+					let formatted_xp = gexp_to_uptime_as_string(xp_value);
 					uptime_history.insert(formatted_date, formatted_xp);
 				}
 			}
 
-			let avg_uptime = format!("{}h {}m", total_xp / 7 / 9000, (total_xp / 7 % 9000) / 150);
+			let avg_uptime = gexp_to_uptime_as_string(total_xp);
 			return Ok((uptime_history, avg_uptime));
 		}
 	}
