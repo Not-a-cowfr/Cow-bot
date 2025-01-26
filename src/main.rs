@@ -6,6 +6,9 @@ mod uptime;
 #[path = "commands/color.rs"]
 mod color;
 
+#[path = "commands/get_linked_account.rs"]
+mod get_linked_account;
+
 mod commands;
 #[path = "data/database.rs"]
 mod database;
@@ -14,16 +17,15 @@ use std::env::var;
 use std::sync::Arc;
 use std::time::Duration;
 
-use database::create_users_table;
+use database::{create_uptime_table, create_users_table};
 use dotenv::dotenv;
 use poise::serenity_prelude as serenity;
+use types::{Context, Error};
 
 mod types {
 	pub type Error = Box<dyn std::error::Error + Send + Sync>;
 	pub type Context<'a> = poise::Context<'a, super::Data, Error>;
 }
-
-use types::{Context, Error};
 
 // Custom user data passed to all command functions
 pub struct Data {
@@ -34,11 +36,15 @@ async fn on_error(error: poise::FrameworkError<'_, Data, Error>) {
 	match error {
 		| poise::FrameworkError::Setup { error, .. } => panic!("Failed to start bot: {:?}", error),
 		| poise::FrameworkError::Command { error, ctx, .. } => {
-			println!("[ERROR] in command '{}': {:?}", ctx.command().name, error);
+			println!(
+				"\x1b[31;1m[ERROR] in command '{}':\x1b[0m {:?}",
+				ctx.command().name,
+				error
+			);
 		},
 		| error => {
 			if let Err(e) = poise::builtins::on_error(error).await {
-				println!("[ERROR] while handling error: {}", e)
+				println!("\x1b[31;1m[ERROR] while handling error:\x1b[0m {}", e)
 			}
 		},
 	}
@@ -49,11 +55,11 @@ async fn main() {
 	dotenv().ok();
 	env_logger::init();
 
-	let api_key = var("API_KEY").expect("[ERROR] Missing `API_KEY` env var, please include this in the environment variables or features may not work");
+	let api_key = var("API_KEY").expect("\x1b[31;1m[ERROR] Missing `API_KEY` env var, please include this in the environment variables or features may not work\x1b[0m");
 
 	let options = poise::FrameworkOptions {
 		commands: vec![
-			uptime::get_linked_account(),
+			get_linked_account::get_linked_account(),
 			uptime::uptime(),
 			color::color(),
 		],
@@ -105,10 +111,11 @@ async fn main() {
 		.options(options)
 		.build();
 
-	create_users_table().expect("[ERROR] Failed to create database 'users'");
+	create_users_table().expect("\x1b[31;1m[ERROR] Failed to create database 'users'\x1b[0m\n\n");
+	create_uptime_table().expect("\x1b[31;1m[ERROR] Failed to create database 'uptime'\x1b[0m\n\n");
 
 	let token = var("BOT_TOKEN").expect(
-		"[ERROR] Missing `BOT_TOKEN` env var, please include this in the environment variables",
+		"\x1b[31;1m[ERROR] Missing `BOT_TOKEN` env var, please include this in the environment variables\x1b[0m",
 	);
 	let intents =
 		serenity::GatewayIntents::non_privileged() | serenity::GatewayIntents::MESSAGE_CONTENT;
