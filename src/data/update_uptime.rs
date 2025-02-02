@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 use std::time::Duration;
 
-use rusqlite::{params, Connection, Result};
+use rusqlite::{Connection, Result, params};
 use serde::Deserialize;
 use serenity::json::Value;
 
@@ -17,15 +17,11 @@ pub enum Error {
 }
 
 impl From<rusqlite::Error> for Error {
-	fn from(_err: rusqlite::Error) -> Error {
-		Error::DatabaseError(())
-	}
+	fn from(_err: rusqlite::Error) -> Error { Error::DatabaseError(()) }
 }
 
 impl From<Box<dyn std::error::Error + Send + Sync>> for Error {
-	fn from(_err: Box<dyn std::error::Error + Send + Sync>) -> Error {
-		Error::ApiError(())
-	}
+	fn from(_err: Box<dyn std::error::Error + Send + Sync>) -> Error { Error::ApiError(()) }
 }
 
 // todo use guild id instead of this fuckery with uuids and removing ones weve updated already
@@ -85,13 +81,13 @@ struct GuildResponse {
 #[derive(Clone, Deserialize)]
 struct Guild {
 	members: Vec<Member>,
-	_id: String,
+	_id:     String,
 }
 
 #[derive(Clone, Deserialize)]
 #[allow(non_snake_case)]
 struct Member {
-	uuid: String,
+	uuid:       String,
 	expHistory: Option<Value>,
 }
 

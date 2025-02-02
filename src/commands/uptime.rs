@@ -56,7 +56,7 @@ pub async fn uptime(
 		.color(color);
 
 	ctx.send(CreateReply::default().embed(embed)).await?;
-	println!("time take: {:?}", start.elapsed());
+	log::info!("time taken: {:?}", start.elapsed());
 	Ok(())
 }
 
@@ -155,7 +155,7 @@ async fn update_uptime(
 		}
 	}
 
-	tx.commit()?; // Commit transaction
+	tx.commit()?;
 
 	Ok(())
 }
