@@ -126,6 +126,17 @@ async fn main() {
 		.options(options)
 		.build();
 
+	tokio::task::spawn_blocking(move || {
+		if let Err(err) =
+			tokio::runtime::Handle::current().block_on(update_uptime::update_uptime(&api_key))
+		{
+			eprintln!(
+				"\x1b[31;1m[ERROR] Error in uptime tracker:\x1b[0m\n\n{:?}",
+				err
+			);
+		}
+	});
+
 	let token = var("BOT_TOKEN").expect(
 		"\x1b[31;1m[ERROR] Missing `BOT_TOKEN` env var, please include this in the environment variables\x1b[0m",
 	);
@@ -137,8 +148,4 @@ async fn main() {
 		.await;
 
 	client.unwrap().start().await.unwrap();
-
-	update_uptime::update_uptime(&api_key)
-		.await
-		.expect("\x1b[31;1m[ERROR] Error in uptime tracker:\x1b[0m\n\n");
 }
