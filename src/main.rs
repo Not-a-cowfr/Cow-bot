@@ -21,6 +21,8 @@ use std::time::Duration;
 use database::{create_uptime_table, create_users_table};
 use dotenv::dotenv;
 use poise::serenity_prelude as serenity;
+use r2d2::Pool;
+use r2d2_sqlite::SqliteConnectionManager;
 use types::{Context, Error};
 
 mod types {
@@ -30,7 +32,8 @@ mod types {
 
 // Custom user data passed to all command functions
 pub struct Data {
-	api_key: String,
+	api_key:        String,
+	uptime_db_pool: Pool<SqliteConnectionManager>,
 }
 
 async fn on_error(error: poise::FrameworkError<'_, Data, Error>) {
@@ -100,6 +103,14 @@ async fn main() {
 		..Default::default()
 	};
 
+	create_users_table().expect("\x1b[31;1m[ERROR] Failed to create database 'users'\x1b[0m\n\n");
+	create_uptime_table().expect("\x1b[31;1m[ERROR] Failed to create database 'uptime'\x1b[0m\n\n");
+
+	// create uptime connection pool
+	let manager = SqliteConnectionManager::file("src/data/uptime.db")
+		.with_flags(rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE);
+	let uptime_db_pool = Pool::new(manager).expect("Failed to create database pool");
+
 	let clone_api_key = api_key.clone();
 	let framework = poise::Framework::builder()
 		.setup(move |ctx, _ready, framework| {
@@ -108,14 +119,12 @@ async fn main() {
 				poise::builtins::register_globally(ctx, &framework.options().commands).await?;
 				Ok(Data {
 					api_key: clone_api_key,
+					uptime_db_pool,
 				})
 			})
 		})
 		.options(options)
 		.build();
-
-	create_users_table().expect("\x1b[31;1m[ERROR] Failed to create database 'users'\x1b[0m\n\n");
-	create_uptime_table().expect("\x1b[31;1m[ERROR] Failed to create database 'uptime'\x1b[0m\n\n");
 
 	let token = var("BOT_TOKEN").expect(
 		"\x1b[31;1m[ERROR] Missing `BOT_TOKEN` env var, please include this in the environment variables\x1b[0m",

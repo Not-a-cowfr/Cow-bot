@@ -11,12 +11,7 @@
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Cargo.lock" beforeDir="false" afterPath="$PROJECT_DIR$/Cargo.lock" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/Cargo.toml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/commands/color.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/commands/color.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/commands/get_linked_account.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/commands/get_linked_account.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/commands/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/commands/mod.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/commands/uptime.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/commands/uptime.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/commands/utils.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/commands/utils.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/data/database.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/data/database.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/main.rs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -129,7 +124,6 @@
     </list>
   </component>
   <component name="RustProjectSettings">
-    <option name="rustcTarget" value="x86_64-pc-windows-msvc" />
     <option name="toolchainHomeDirectory" value="$USER_HOME$/.cargo/bin" />
   </component>
   <component name="RustfmtProjectSettings">
@@ -193,7 +187,9 @@
       <workItem from="1738022334201" duration="679000" />
       <workItem from="1738055420439" duration="650000" />
       <workItem from="1738481798467" duration="3043000" />
-      <workItem from="1738484912621" duration="3654000" />
+      <workItem from="1738484912621" duration="5537000" />
+      <workItem from="1738490524076" duration="1020000" />
+      <workItem from="1738491583199" duration="2212000" />
     </task>
     <servers />
   </component>

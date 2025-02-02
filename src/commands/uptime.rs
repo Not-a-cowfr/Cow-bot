@@ -3,7 +3,9 @@ use std::time::Instant;
 
 use chrono::{Duration, Utc};
 use poise::CreateReply;
-use rusqlite::{Connection, params};
+use r2d2::Pool;
+use r2d2_sqlite::SqliteConnectionManager;
+use rusqlite::params;
 use serenity::builder::CreateEmbed;
 
 use crate::commands::utils::{get_account_from_anything, get_color};
@@ -19,22 +21,21 @@ pub async fn uptime(
 	let start = Instant::now();
 	ctx.defer().await?;
 
-	let user: String = user.unwrap_or_else(|| ctx.author().id.to_string());
+	let user_input = user.unwrap_or_else(|| ctx.author().id.to_string());
+	let (username, uuid) = get_account_from_anything(&user_input).await?;
 	let time_window: i64 = window.unwrap_or(7);
 
 	let api_key = &ctx.data().api_key;
+	let pool = &ctx.data().uptime_db_pool;
 
-	let author = ctx.author();
-	let color = get_color(&author.name);
-
-	let uptime_data = match get_uptime(&user, time_window).await {
+	let uptime_data = match get_uptime(&uuid, time_window, pool).await {
 		| Ok(data) => data,
-		| Err(_) => match update_uptime(api_key, user.clone()).await {
-			| Ok(_) => match get_uptime(&user, time_window).await {
+		| Err(_) => match update_uptime(api_key, uuid.clone(), pool).await {
+			| Ok(_) => match get_uptime(&uuid, time_window, pool).await {
 				| Ok(data) => data,
-				| Err(_) => get_uptime_with_unknown(&user, time_window).await?,
+				| Err(_) => get_uptime_with_unknown(&uuid, time_window, pool).await?,
 			},
-			| Err(_) => get_uptime_with_unknown(&user, time_window).await?,
+			| Err(_) => get_uptime_with_unknown(&uuid, time_window, pool).await?,
 		},
 	};
 
@@ -48,101 +49,76 @@ pub async fn uptime(
 		description.push_str(&format!("{}: {}\n", date, uptime_str));
 	}
 
-	let (username, _uuid) = get_account_from_anything(&user).await?;
+	let color = get_color(&ctx.author().name);
 	let embed = CreateEmbed::default()
 		.title(format!("Uptime for {}", username))
 		.description(description)
 		.color(color);
 
 	ctx.send(CreateReply::default().embed(embed)).await?;
-
-	println!("time taken for command: {:?}", start.elapsed());
+	println!("time take: {:?}", start.elapsed());
 	Ok(())
 }
 
 async fn get_uptime_with_unknown(
-	user: &str,
+	uuid: &str,
 	time_window: i64,
+	pool: &Pool<SqliteConnectionManager>,
 ) -> Result<Vec<(String, i64)>, Error> {
-	let (_, uuid) = get_account_from_anything(&user).await?;
-
-	let conn = Connection::open("src/data/uptime.db")?;
-
+	let conn = pool.get()?;
 	let current_date = Utc::now().date_naive();
-
-	let mut results = Vec::new();
-	for days_ago in 0..time_window {
-		let date = current_date - Duration::days(days_ago);
-		results.push((date.format("%Y-%m-%d").to_string(), -1));
-	}
+	let mut results = Vec::with_capacity(time_window as usize);
 
 	let mut stmt = conn.prepare(
 		"SELECT date, gexp FROM uptime
-            WHERE uuid = ?
-            AND date >= date('now', ? || ' days')
-            ORDER BY date DESC",
+         WHERE uuid = ? AND date >= date('now', '-' || (? - 1) || ' days')
+         ORDER BY date DESC",
 	)?;
 
-	let rows = stmt.query_map([uuid, format!("-{}", time_window - 1)], |row| {
-		Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?))
-	})?;
-
 	let mut date_to_gexp = HashMap::new();
-	for row in rows {
-		if let Ok((date, gexp)) = row {
-			date_to_gexp.insert(date, gexp);
-		}
+	for row in stmt.query_map(params![uuid, time_window], |row| {
+		Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?))
+	})? {
+		let (date, gexp) = row?;
+		date_to_gexp.insert(date, gexp);
 	}
 
-	for result in results.iter_mut() {
-		if let Some(&gexp) = date_to_gexp.get(&result.0) {
-			result.1 = gexp;
-		}
+	for days_ago in 0..time_window {
+		let date = (current_date - Duration::days(days_ago))
+			.format("%Y-%m-%d")
+			.to_string();
+		results.push((date.clone(), *date_to_gexp.get(&date).unwrap_or(&-1)));
 	}
 
 	Ok(results)
 }
 
 async fn get_uptime(
-	user: &str,
+	uuid: &str,
 	time_window: i64,
+	pool: &Pool<SqliteConnectionManager>,
 ) -> Result<Vec<(String, i64)>, Error> {
-	let (_, uuid) = get_account_from_anything(&user).await?;
-
-	let conn = Connection::open("src/data/uptime.db")?;
-
-	let current_date = Utc::now().date_naive();
-
-	let mut expected_dates = HashSet::new();
-	for days_ago in 0..time_window {
-		let date = current_date - Duration::days(days_ago);
-		expected_dates.insert(date.format("%Y-%m-%d").to_string());
-	}
-
+	let conn = pool.get()?;
 	let mut stmt = conn.prepare(
 		"SELECT date, gexp FROM uptime
-            WHERE uuid = ?
-            AND date >= date('now', ? || ' days')
-            ORDER BY date DESC",
+         WHERE uuid = ? AND date >= date('now', '-' || (? - 1) || ' days')
+         ORDER BY date DESC",
 	)?;
 
-	let rows = stmt.query_map([uuid, format!("-{}", time_window - 1)], |row| {
+	let rows = stmt.query_map(params![uuid, time_window], |row| {
 		Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?))
 	})?;
 
-	let mut found_dates = HashSet::new();
 	let mut results = Vec::new();
+	let mut found_dates = HashSet::new();
 
 	for row in rows {
-		if let Ok((date, gexp)) = row {
-			found_dates.insert(date.clone());
-			results.push((date, gexp));
-		}
+		let (date, gexp) = row?;
+		found_dates.insert(date.clone());
+		results.push((date, gexp));
 	}
 
-	let missing_dates: Vec<_> = expected_dates.difference(&found_dates).collect();
-
-	if !missing_dates.is_empty() {
+	if results.len() < time_window as usize {
 		return Err("Missing dates".into());
 	}
 
@@ -151,22 +127,24 @@ async fn get_uptime(
 
 async fn update_uptime(
 	api_key: &str,
-	player: String,
+	uuid: String,
+	pool: &Pool<SqliteConnectionManager>,
 ) -> Result<(), Error> {
-	let conn = Connection::open("src/data/uptime.db")?;
+	let mut conn = pool.get()?;
+	let (guild_id, member_uptime_history) = get_guild_uptime_data(api_key, uuid.clone()).await?;
 
-	let (guild_id, member_uptime_history) = get_guild_uptime_data(api_key, player).await?;
+	let tx = conn.transaction()?;
 
 	for (player_uuid, uptime_history) in member_uptime_history {
 		for (date, gexp) in uptime_history {
-			conn.execute(
+			tx.execute(
 				"UPDATE uptime
                     SET guild_id = ?1, gexp = ?3
                     WHERE uuid = ?2 AND date = ?4",
 				params![guild_id, player_uuid, gexp, date],
 			)?;
 
-			conn.execute(
+			tx.execute(
 				"INSERT INTO uptime (guild_id, uuid, gexp, date)
                     SELECT ?1, ?2, ?3, ?4
                     WHERE NOT EXISTS (
@@ -176,6 +154,8 @@ async fn update_uptime(
 			)?;
 		}
 	}
+
+	tx.commit()?; // Commit transaction
 
 	Ok(())
 }
