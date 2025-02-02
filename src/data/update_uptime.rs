@@ -12,19 +12,19 @@ mod uptime;
 
 #[derive(Debug)]
 pub enum Error {
-	DatabaseError(rusqlite::Error),
-	ApiError(Box<dyn std::error::Error + Send + Sync>),
+	DatabaseError(()),
+	ApiError(()),
 }
 
 impl From<rusqlite::Error> for Error {
-	fn from(err: rusqlite::Error) -> Error {
-		Error::DatabaseError(err)
+	fn from(_err: rusqlite::Error) -> Error {
+		Error::DatabaseError(())
 	}
 }
 
 impl From<Box<dyn std::error::Error + Send + Sync>> for Error {
-	fn from(err: Box<dyn std::error::Error + Send + Sync>) -> Error {
-		Error::ApiError(err)
+	fn from(_err: Box<dyn std::error::Error + Send + Sync>) -> Error {
+		Error::ApiError(())
 	}
 }
 
@@ -119,12 +119,10 @@ pub async fn get_guild_uptime_data(
 
 	for member in guild_response.guild.clone().unwrap().members {
 		let mut uptime_history = HashMap::new();
-		let mut total_xp = 0;
 
 		if let Some(ref exp_history) = member.expHistory {
 			for (date, xp) in exp_history.as_object().unwrap() {
 				let xp_value = xp.as_i64().unwrap();
-				total_xp += xp_value;
 				uptime_history.insert(date.to_string(), xp_value);
 			}
 		}

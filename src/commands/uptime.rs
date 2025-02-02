@@ -15,8 +15,8 @@ use crate::{Context, Error};
 #[poise::command(slash_command)]
 pub async fn uptime(
 	ctx: Context<'_>,
-	#[description = "Username, UUID, or discord ID"] mut user: Option<String>,
-	#[description = "Time window, eg 7 for 7 days"] mut window: Option<i64>,
+	#[description = "Username, UUID, or discord ID"] user: Option<String>,
+	#[description = "Time window, eg 7 for 7 days"] window: Option<i64>,
 ) -> Result<(), Error> {
 	let start = Instant::now();
 	ctx.defer().await?;
