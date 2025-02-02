@@ -1,17 +1,18 @@
 #![warn(clippy::str_to_string)]
 
+#[path = "commands/color.rs"]
+mod color;
+#[path = "commands/get_linked_account.rs"]
+mod get_linked_account;
 #[path = "commands/uptime.rs"]
 mod uptime;
 
-#[path = "commands/color.rs"]
-mod color;
-
-#[path = "commands/get_linked_account.rs"]
-mod get_linked_account;
-
 mod commands;
+
 #[path = "data/database.rs"]
 mod database;
+#[path = "data/update_uptime.rs"]
+mod update_uptime;
 
 use std::env::var;
 use std::sync::Arc;
@@ -99,13 +100,15 @@ async fn main() {
 		..Default::default()
 	};
 
+	let clone_api_key = api_key.clone();
 	let framework = poise::Framework::builder()
 		.setup(move |ctx, _ready, framework| {
-			let api_key = api_key.clone();
 			Box::pin(async move {
 				println!("Logged in as {}", _ready.user.name);
 				poise::builtins::register_globally(ctx, &framework.options().commands).await?;
-				Ok(Data { api_key })
+				Ok(Data {
+					api_key: clone_api_key,
+				})
 			})
 		})
 		.options(options)
@@ -124,5 +127,9 @@ async fn main() {
 		.framework(framework)
 		.await;
 
-	client.unwrap().start().await.unwrap()
+	client.unwrap().start().await.unwrap();
+
+	update_uptime::update_uptime(&api_key)
+		.await
+		.expect("\x1b[31;1m[ERROR] Error in uptime tracker:\x1b[0m\n\n");
 }
