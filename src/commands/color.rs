@@ -35,10 +35,10 @@ pub async fn color(
 		user_exists = rows.next()?.unwrap().get::<_, i64>(0)? > 0;
 
 		if user_exists {
-			conn.execute("UPDATE users SET color = ?1 WHERE userid = ?2", params![
-				color_but_with_thingy,
-				user_id
-			])?;
+			conn.execute(
+				"UPDATE users SET color = ?1 WHERE userid = ?2",
+				params![color_but_with_thingy, user_id],
+			)?;
 		} else {
 			conn.execute(
 				"INSERT INTO users (username, userid, color) VALUES (?1, ?2, ?3)",

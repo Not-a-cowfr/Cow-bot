@@ -22,7 +22,17 @@ pub async fn uptime(
 	ctx.defer().await?;
 
 	let user_input = user.unwrap_or_else(|| ctx.author().id.to_string());
-	let (username, uuid) = get_account_from_anything(&user_input).await?;
+	let (username, uuid) = match get_account_from_anything(&user_input).await {
+		| Ok(result) => result,
+		| Err(_e) => {
+			let embed = CreateEmbed::default()
+				.title("Error")
+				.description("No linked account found")
+				.colour(0xa10d0d);
+			ctx.send(CreateReply::default().embed(embed)).await?;
+			return Ok(());
+		},
+	};
 	let time_window: i64 = window.unwrap_or(7);
 
 	let api_key = &ctx.data().api_key;

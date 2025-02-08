@@ -1,7 +1,8 @@
 use std::collections::{HashMap, HashSet};
+use std::fmt;
 use std::time::Duration;
 
-use rusqlite::{Connection, Result, params};
+use rusqlite::{Connection, Result as SqliteResult, params};
 use serde::Deserialize;
 use serenity::json::Value;
 
@@ -12,65 +13,32 @@ mod uptime;
 
 #[derive(Debug)]
 pub enum Error {
-	DatabaseError(()),
-	ApiError(()),
+	Database(rusqlite::Error),
+	Api(String),
+	NoGuild(String),
+}
+
+impl std::error::Error for Error {}
+
+impl fmt::Display for Error {
+	fn fmt(
+		&self,
+		f: &mut fmt::Formatter<'_>,
+	) -> fmt::Result {
+		match self {
+			| Error::Database(e) => write!(f, "Database error: {}", e),
+			| Error::Api(msg) => write!(f, "API error: {}", msg),
+			| Error::NoGuild(uuid) => write!(f, "Player {} is not in a guild", uuid),
+		}
+	}
 }
 
 impl From<rusqlite::Error> for Error {
-	fn from(_err: rusqlite::Error) -> Error { Error::DatabaseError(()) }
+	fn from(err: rusqlite::Error) -> Error { Error::Database(err) }
 }
 
 impl From<Box<dyn std::error::Error + Send + Sync>> for Error {
-	fn from(_err: Box<dyn std::error::Error + Send + Sync>) -> Error { Error::ApiError(()) }
-}
-
-// todo use guild id instead of this fuckery with uuids and removing ones weve updated already
-pub async fn update_uptime(api_key: &str) -> std::result::Result<(), Error> {
-	let conn = Connection::open("src/data/uptime.db")?;
-
-	loop {
-		let mut processed_uuids = HashSet::new();
-
-		let mut stmt = conn.prepare("SELECT DISTINCT uuid FROM uptime")?;
-		let players: Vec<String> = stmt
-			.query_map([], |row| row.get(0))?
-			.filter_map(Result::ok)
-			.collect();
-
-		println!("Updating Uptime for {} players", players.len());
-
-		for player in players {
-			if processed_uuids.contains(&player) {
-				continue;
-			}
-
-			let (guild_id, member_uptime_history) = get_guild_uptime_data(api_key, player).await?;
-
-			for (player_uuid, uptime_history) in member_uptime_history {
-				processed_uuids.insert(player_uuid.clone());
-
-				for (date, gexp) in uptime_history {
-					conn.execute(
-						"UPDATE uptime
-							 SET guild_id = ?1, gexp = ?3
-							 WHERE uuid = ?2 AND date = ?4",
-						params![guild_id, player_uuid, gexp, date],
-					)?;
-
-					conn.execute(
-						"INSERT INTO uptime (guild_id, uuid, gexp, date)
-							 SELECT ?1, ?2, ?3, ?4
-							 WHERE NOT EXISTS (
-								 SELECT 1 FROM uptime WHERE uuid = ?2 AND date = ?4
-							 )",
-						params![guild_id, player_uuid, gexp, date],
-					)?;
-				}
-			}
-		}
-
-		tokio::time::sleep(Duration::from_secs(86400)).await; // 24 hours
-	}
+	fn from(err: Box<dyn std::error::Error + Send + Sync>) -> Error { Error::Api(err.to_string()) }
 }
 
 #[derive(Deserialize)]
@@ -91,39 +59,101 @@ struct Member {
 	expHistory: Option<Value>,
 }
 
+pub async fn update_uptime(api_key: &str) -> Result<(), Error> {
+	let conn = Connection::open("src/data/uptime.db")?;
+	loop {
+		let mut processed_uuids = HashSet::new();
+		let mut stmt = conn.prepare("SELECT DISTINCT uuid FROM uptime")?;
+		let players: Vec<String> = stmt
+			.query_map([], |row| row.get(0))?
+			.filter_map(SqliteResult::ok)
+			.collect();
+
+		println!("Updating Uptime for {} players", players.len());
+
+		for player in players {
+			if processed_uuids.contains(&player) {
+				continue;
+			}
+
+			match get_guild_uptime_data(api_key, player.clone()).await {
+				| Ok((guild_id, member_uptime_history)) => {
+					for (player_uuid, uptime_history) in member_uptime_history {
+						processed_uuids.insert(player_uuid.clone());
+						update_player_records(&conn, &guild_id, &player_uuid, uptime_history)?;
+					}
+				},
+				| Err(e) => {
+					eprintln!("\x1b[93m[WARN] updating uptime: {}\x1b[0m", e);
+					continue;
+				},
+			}
+		}
+
+		tokio::time::sleep(Duration::from_secs(86400)).await;
+	}
+}
+
+fn update_player_records(
+	conn: &Connection,
+	guild_id: &str,
+	player_uuid: &str,
+	uptime_history: HashMap<String, i64>,
+) -> Result<(), Error> {
+	for (date, gexp) in uptime_history {
+		conn.execute(
+			"UPDATE uptime
+             SET guild_id = ?1, gexp = ?3
+             WHERE uuid = ?2 AND date = ?4",
+			params![guild_id, player_uuid, gexp, date],
+		)?;
+
+		conn.execute(
+			"INSERT INTO uptime (guild_id, uuid, gexp, date)
+             SELECT ?1, ?2, ?3, ?4
+             WHERE NOT EXISTS (
+                 SELECT 1 FROM uptime WHERE uuid = ?2 AND date = ?4
+             )",
+			params![guild_id, player_uuid, gexp, date],
+		)?;
+	}
+	Ok(())
+}
+
 pub async fn get_guild_uptime_data(
 	api_key: &str,
 	identifier: String,
-) -> std::result::Result<
-	(String, HashMap<String, HashMap<String, i64>>),
-	Box<dyn std::error::Error + Send + Sync>,
-> {
+) -> Result<(String, HashMap<String, HashMap<String, i64>>), Error> {
 	let (_username, uuid) = get_account_from_anything(&identifier).await?;
 	let url = format!("https://api.hypixel.net/v2/guild?key={api_key}&player={uuid}");
+
 	let response = reqwest::get(&url).await?;
 	let response_text = response.text().await?;
-	let guild_response: GuildResponse = serde_json::from_str(&response_text)?;
+	let guild_response: GuildResponse = serde_json::from_str(&response_text)
+		.map_err(|e| Error::ParseError(format!("Failed to parse guild response: {}", e)))?;
 
-	if guild_response.guild.is_none() {
-		return Err(Box::new(std::io::Error::new(
-			std::io::ErrorKind::NotFound,
-			"Player is not in a guild",
-		)));
-	}
+	let guild = guild_response
+		.guild
+		.ok_or_else(|| Error::NoGuild(uuid.clone()))?;
 
 	let mut guild_uptime_data = HashMap::new();
 
-	for member in guild_response.guild.clone().unwrap().members {
+	for member in guild.members {
 		let mut uptime_history = HashMap::new();
+		if let Some(exp_history) = member.expHistory {
+			let exp_map = exp_history
+				.as_object()
+				.ok_or_else(|| Error::ParseError("Invalid exp_history format".to_string()))?;
 
-		if let Some(ref exp_history) = member.expHistory {
-			for (date, xp) in exp_history.as_object().unwrap() {
-				let xp_value = xp.as_i64().unwrap();
+			for (date, xp) in exp_map {
+				let xp_value = xp
+					.as_i64()
+					.ok_or_else(|| Error::ParseError("Invalid XP value format".to_string()))?;
 				uptime_history.insert(date.to_string(), xp_value);
 			}
 		}
 		guild_uptime_data.insert(member.uuid, uptime_history);
 	}
 
-	Ok((guild_response.guild.unwrap()._id, guild_uptime_data))
+	Ok((guild._id, guild_uptime_data))
 }
