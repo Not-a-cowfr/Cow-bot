@@ -90,7 +90,7 @@ pub async fn update_uptime(api_key: &str) -> Result<(), Error> {
 			}
 		}
 
-		tokio::time::sleep(Duration::from_secs(86400)).await;
+		tokio::time::sleep(Duration::from_secs(3 * 60 * 60)).await;
 	}
 }
 
