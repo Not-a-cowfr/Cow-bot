@@ -70,6 +70,7 @@ pub async fn uptime(
 	Ok(())
 }
 
+#[allow(dead_code)]
 async fn get_uptime_with_unknown(
 	uuid: &str,
 	time_window: i64,
@@ -103,6 +104,7 @@ async fn get_uptime_with_unknown(
 	Ok(results)
 }
 
+#[allow(dead_code)]
 async fn get_uptime(
 	uuid: &str,
 	time_window: i64,
@@ -135,6 +137,7 @@ async fn get_uptime(
 	Ok(results)
 }
 
+#[allow(dead_code)]
 async fn update_uptime(
 	api_key: &str,
 	uuid: String,
@@ -170,6 +173,7 @@ async fn update_uptime(
 	Ok(())
 }
 
+#[allow(dead_code)]
 pub fn gexp_to_uptime_as_string(gexp: i64) -> String {
 	format!("{}h {}m", gexp / 9000, (gexp % 9000) / 150)
 }
