@@ -123,14 +123,14 @@ fn update_player_records(
 pub async fn get_guild_uptime_data(
 	api_key: &str,
 	identifier: String,
-) -> Result<(String, HashMap<String, HashMap<String, i64>>), Error> {
+) -> Result<(String, HashMap<String, HashMap<String, i64>>), Box<dyn std::error::Error + Send + Sync>>
+{
 	let (_username, uuid) = get_account_from_anything(&identifier).await?;
 	let url = format!("https://api.hypixel.net/v2/guild?key={api_key}&player={uuid}");
 
 	let response = reqwest::get(&url).await?;
 	let response_text = response.text().await?;
-	let guild_response: GuildResponse = serde_json::from_str(&response_text)
-		.map_err(|e| Error::ParseError(format!("Failed to parse guild response: {}", e)))?;
+	let guild_response: GuildResponse = serde_json::from_str(&response_text)?;
 
 	let guild = guild_response
 		.guild
@@ -140,15 +140,10 @@ pub async fn get_guild_uptime_data(
 
 	for member in guild.members {
 		let mut uptime_history = HashMap::new();
-		if let Some(exp_history) = member.expHistory {
-			let exp_map = exp_history
-				.as_object()
-				.ok_or_else(|| Error::ParseError("Invalid exp_history format".to_string()))?;
 
-			for (date, xp) in exp_map {
-				let xp_value = xp
-					.as_i64()
-					.ok_or_else(|| Error::ParseError("Invalid XP value format".to_string()))?;
+		if let Some(ref exp_history) = member.expHistory {
+			for (date, xp) in exp_history.as_object().unwrap() {
+				let xp_value = xp.as_i64().unwrap();
 				uptime_history.insert(date.to_string(), xp_value);
 			}
 		}
