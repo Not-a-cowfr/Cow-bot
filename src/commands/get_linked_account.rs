@@ -19,21 +19,20 @@ pub async fn get_linked_account(
 			let embed = CreateEmbed::default()
 				.title("Error")
 				.description("No linked account found")
-				.colour(0xa10d0d);
+				.color(ctx.data().error_color);
 			ctx.send(CreateReply::default().embed(embed)).await?;
 			return Ok(());
 		},
 	};
 
-	let author = ctx.author();
-	let color = get_color(&author.name);
+	let color = get_color(&ctx.author().name);
 
 	let embed = CreateEmbed::default()
         .title(format!("Player information for **{username}**"))
         .description(format!(
             "Username: **{username}**\nUUID: `{uuid}`\n\n<https://elitebot.dev/@{username}>\n\n<https://sky.shiiyu.moe/stats/{username}>"
         ))
-        .colour(color);
+        .color(color);
 
 	ctx.send(CreateReply::default().embed(embed)).await?;
 	Ok(())

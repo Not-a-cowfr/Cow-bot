@@ -94,6 +94,7 @@ pub async fn get_mojang_info(player: String) -> Result<(String, String), Error> 
 	let mojang_info: MojangResponse = serde_json::from_str(&response_text)?;
 	Ok((mojang_info.name, mojang_info.id))
 }
+
 pub async fn get_linked_elite_account(discordid: String) -> Result<(String, String), Error> {
 	let url = format!("https://api.elitebot.dev/account/{discordid}");
 	let response = reqwest::get(&url).await?;

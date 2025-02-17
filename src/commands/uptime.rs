@@ -28,7 +28,7 @@ pub async fn uptime(
 			let embed = CreateEmbed::default()
 				.title("Error")
 				.description("No linked account found")
-				.colour(0xa10d0d);
+				.color(ctx.data().error_color);
 			ctx.send(CreateReply::default().embed(embed)).await?;
 			return Ok(());
 		},

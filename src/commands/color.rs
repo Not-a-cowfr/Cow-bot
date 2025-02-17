@@ -19,7 +19,7 @@ pub async fn color(
 		let embed = CreateEmbed::default()
 			.title("Error")
 			.description("Invalid hex code. Please provide a valid 6-character hex code.")
-			.colour(0xa10d0d);
+			.color(ctx.data().error_color);
 		ctx.send(CreateReply::default().embed(embed)).await?;
 		return Ok(());
 	}
@@ -50,7 +50,7 @@ pub async fn color(
 	let embed = CreateEmbed::default()
 		.title("Color Updated")
 		.description("Your color has been updated successfully!")
-		.colour(color_value);
+		.color(color_value);
 	ctx.send(CreateReply::default().embed(embed)).await?;
 	Ok(())
 }
