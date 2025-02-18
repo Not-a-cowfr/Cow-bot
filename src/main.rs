@@ -34,7 +34,7 @@ mod types {
 pub struct Data {
 	api_key:        String,
 	uptime_db_pool: Pool<SqliteConnectionManager>,
-	error_color: u32,
+	error_color:    u32,
 }
 
 async fn on_error(error: poise::FrameworkError<'_, Data, Error>) {

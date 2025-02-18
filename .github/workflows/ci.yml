@@ -33,7 +33,7 @@ jobs:
 
   build:
     name: Build
-    needs: rustfmt
+    needs:  rustfmt
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

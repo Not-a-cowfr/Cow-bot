@@ -19,12 +19,11 @@ fn get_color_backend(username: &str) -> Result<Option<String>> {
 pub fn get_color(username: &str) -> u32 {
 	let color_result = get_color_backend(username);
 
-	match color_result {
-		| Ok(Some(color_str)) => {
-			u32::from_str_radix(&color_str.replace("0x", ""), 16).unwrap_or(0x383838)
-		},
-		| _ => 0x383838, // default color if there's an error or no color found
-	}
+	color_result
+		.ok()
+		.flatten()
+		.and_then(|color_str| u32::from_str_radix(color_str.trim_start_matches("0x"), 16).ok())
+		.unwrap_or(0x383838) // default color if there's an error or no color found
 }
 
 pub async fn get_account_from_anything(identifier: &str) -> Result<(String, String), Error> {
