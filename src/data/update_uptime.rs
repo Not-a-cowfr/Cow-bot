@@ -84,7 +84,8 @@ pub async fn update_uptime(api_key: &str) -> Result<(), Error> {
 						update_player_records(&conn, &guild_id, &player_uuid, uptime_history)?;
 					}
 				},
-				| Err(_) => {
+				| Err(e) => {
+					eprintln!("error: {}", e);
 					no_guild += 1;
 					continue;
 				},
@@ -92,7 +93,7 @@ pub async fn update_uptime(api_key: &str) -> Result<(), Error> {
 		}
 		if no_guild > 0 {
 			println!(
-				"\x1b[34m[INFO] {} players are no longer in guild\x1b[0m",
+				"\x1b[34m[INFO] {} players are no longer in a guild\x1b[0m",
 				no_guild
 			);
 		}

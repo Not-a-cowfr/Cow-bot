@@ -18,7 +18,7 @@ impl<T, E: std::fmt::Debug> ExpectError<T> for Result<T, E> {
 	}
 }
 
-// todo: add support for subdirectories in src/commands/
+// TODO: add support for subdirectories in src/commands/
 fn main() {
 	let mut module_entries: BTreeSet<String> = BTreeSet::new();
 	let mut function_entries = vec![];

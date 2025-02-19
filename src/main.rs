@@ -1,17 +1,11 @@
-#![warn(clippy::str_to_string)]
-
 mod commands;
-
-#[path = "data/database.rs"]
-mod database;
-#[path = "data/update_uptime.rs"]
-mod update_uptime;
+mod data;
 
 use std::env::var;
 use std::sync::Arc;
 use std::time::Duration;
 
-use database::{create_uptime_table, create_users_table};
+use data::database::{create_uptime_table, create_users_table};
 use dotenv::dotenv;
 use poise::serenity_prelude as serenity;
 use r2d2::Pool;
@@ -127,7 +121,7 @@ async fn main() {
 
 	tokio::task::spawn_blocking(move || {
 		if let Err(err) =
-			tokio::runtime::Handle::current().block_on(update_uptime::update_uptime(&api_key))
+			tokio::runtime::Handle::current().block_on(data::update_uptime::update_uptime(&api_key))
 		{
 			eprintln!(
 				"\x1b[31;1m[ERROR] Error in uptime tracker:\x1b[0m\n\n{:?}",

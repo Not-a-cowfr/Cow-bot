@@ -9,7 +9,7 @@ use rusqlite::params;
 use serenity::builder::CreateEmbed;
 
 use crate::commands::utils::{get_account_from_anything, get_color};
-use crate::update_uptime::get_guild_uptime_data;
+use crate::data::update_uptime::get_guild_uptime_data;
 use crate::{Context, Error};
 
 #[poise::command(slash_command)]
@@ -18,7 +18,7 @@ pub async fn uptime(
 	#[description = "Username, UUID, or discord ID"] user: Option<String>,
 	#[description = "Time window, eg 7 for 7 days"] window: Option<i64>,
 ) -> Result<(), Error> {
-	let start = Instant::now();
+	let mut start = Instant::now();
 	ctx.defer().await?;
 
 	let user_input = user.unwrap_or_else(|| ctx.author().id.to_string());
@@ -33,19 +33,65 @@ pub async fn uptime(
 			return Ok(());
 		},
 	};
+	println!("get username/uuid: {}", start.elapsed().as_millis());
+	start = Instant::now();
 	let time_window: i64 = window.unwrap_or(7);
 
 	let api_key = &ctx.data().api_key;
 	let pool = &ctx.data().uptime_db_pool;
+	println!("get pool: {}", start.elapsed().as_millis());
+	start = Instant::now();
 
 	let uptime_data = match get_uptime(&uuid, time_window, pool).await {
-		| Ok(data) => data,
-		| Err(_) => match update_uptime(api_key, uuid.clone(), pool).await {
-			| Ok(_) => match get_uptime(&uuid, time_window, pool).await {
-				| Ok(data) => data,
-				| Err(_) => get_uptime_with_unknown(&uuid, time_window, pool).await?,
-			},
-			| Err(_) => get_uptime_with_unknown(&uuid, time_window, pool).await?,
+		| Ok(data) => {
+			println!(
+				"Fetched uptime successfully: {} ms",
+				start.elapsed().as_millis()
+			);
+			start = Instant::now();
+			data
+		},
+		| Err(_) => {
+			println!(
+				"Failed to fetch uptime, attempting to update uptime: {} ms",
+				start.elapsed().as_millis()
+			);
+			start = Instant::now();
+			match update_uptime(api_key, uuid.clone(), pool).await {
+				| Ok(_) => {
+					println!(
+						"Uptime updated successfully: {} ms",
+						start.elapsed().as_millis()
+					);
+					start = Instant::now();
+					match get_uptime(&uuid, time_window, pool).await {
+						| Ok(data) => {
+							println!(
+								"Fetched uptime after update: {} ms",
+								start.elapsed().as_millis()
+							);
+							start = Instant::now();
+							data
+						},
+						| Err(_) => {
+							println!(
+								"Failed to fetch uptime after update, trying with unknown: {} ms",
+								start.elapsed().as_millis()
+							);
+							start = Instant::now();
+							get_uptime_with_unknown(&uuid, time_window, pool).await?
+						},
+					}
+				},
+				| Err(_) => {
+					println!(
+						"Failed to update uptime, trying with unknown: {} ms",
+						start.elapsed().as_millis()
+					);
+					start = Instant::now();
+					get_uptime_with_unknown(&uuid, time_window, pool).await?
+				},
+			}
 		},
 	};
 
@@ -58,15 +104,20 @@ pub async fn uptime(
 		};
 		description.push_str(&format!("{}: {}\n", date, uptime_str));
 	}
+	println!("generate description: {}", start.elapsed().as_millis());
+	start = Instant::now();
 
 	let color = get_color(&ctx.author().name);
 	let embed = CreateEmbed::default()
 		.title(format!("Uptime for {}", username))
 		.description(description)
 		.color(color);
+	println!("make embed: {}", start.elapsed().as_millis());
+	start = Instant::now();
 
 	ctx.send(CreateReply::default().embed(embed)).await?;
 	log::info!("time taken: {:?}", start.elapsed());
+	println!("reply: {}", start.elapsed().as_millis());
 	Ok(())
 }
 
