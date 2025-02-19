@@ -77,19 +77,18 @@ pub async fn update_uptime(api_key: &str) -> Result<(), Error> {
 				continue;
 			}
 
-			match get_guild_uptime_data(api_key, player.clone()).await {
+			match get_guild_uptime_data(api_key, player.clone()).await.map_err(Into::into) {
 				| Ok((guild_id, member_uptime_history)) => {
 					for (player_uuid, uptime_history) in member_uptime_history {
 						processed_uuids.insert(player_uuid.clone());
 						update_player_records(&conn, &guild_id, &player_uuid, uptime_history)?;
 					}
 				},
-				| Err(e) => {
-					if e.to_string().contains("is not in a guild") {
-						no_guild += 1;
-					}
+				| Err(Error::NoGuild(_)) => {
+					no_guild += 1;
 					continue;
-				},
+				}
+				| Err(_) => continue,
 			}
 		}
 		if no_guild > 0 {
