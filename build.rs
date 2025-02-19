@@ -1,5 +1,4 @@
 use std::collections::BTreeSet;
-use std::fs;
 
 // #weloveduplicatingcode
 pub trait ExpectError<T> {
@@ -23,7 +22,7 @@ fn main() {
 	let mut module_entries: BTreeSet<String> = BTreeSet::new();
 	let mut function_entries = vec![];
 
-	for entry in fs::read_dir("src/commands").expect_error("Failed to read src/commands/ directory")
+	for entry in std::fs::read_dir("src/commands").expect_error("Failed to read src/commands/ directory")
 	{
 		if let Ok(entry) = entry {
 			let path = entry.path();
@@ -54,5 +53,5 @@ fn main() {
 		function_entries.join(", "),
 	);
 
-	fs::write("src/commands/mod.rs", mod_content).expect_error("Failed to write to mod.rs");
+	std::fs::write("src/commands/mod.rs", mod_content).expect_error("Failed to write to mod.rs");
 }

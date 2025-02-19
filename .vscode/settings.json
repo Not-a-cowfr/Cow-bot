@@ -1,0 +1,5 @@
+{
+    "code-runner.executorMap": {
+        "rust": "cargo +nightly fmt && set RUST_LOG=debug && set RUST_BACKTRACE=1 && cargo run --profile dev -- --color=always --message-format=json-diagnostic-rendered-ansi"
+    }
+}
