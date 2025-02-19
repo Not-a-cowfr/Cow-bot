@@ -68,7 +68,8 @@ async fn main() {
 	dotenv().ok();
 	env_logger::init();
 
-	let api_key = var("API_KEY").expect_error("Missing `API_KEY` env var, please include this in the environment variables or features may not work");
+	let api_key = var("API_KEY")
+		.expect_error("Missing `API_KEY` env var, please include this in your .env file");
 
 	let options = poise::FrameworkOptions {
 		commands: commands::get_all_commands(),
@@ -136,7 +137,7 @@ async fn main() {
 	});
 
 	let token = var("BOT_TOKEN").expect(
-		"\x1b[31;1m[ERROR] Missing `BOT_TOKEN` env var, please include this in the environment variables",
+		"\x1b[31;1m[ERROR] Missing `BOT_TOKEN` env var, please include this in your .env file",
 	);
 	let intents =
 		serenity::GatewayIntents::non_privileged() | serenity::GatewayIntents::MESSAGE_CONTENT;
