@@ -48,11 +48,17 @@ async fn on_error(error: poise::FrameworkError<'_, Data, Error>) {
 }
 
 pub trait ExpectError<T> {
-	fn expect_error(self, msg: &str) -> T;
+	fn expect_error(
+		self,
+		msg: &str,
+	) -> T;
 }
 
 impl<T, E: std::fmt::Debug> ExpectError<T> for Result<T, E> {
-	fn expect_error(self, msg: &str) -> T {
+	fn expect_error(
+		self,
+		msg: &str,
+	) -> T {
 		self.expect(&format!("\x1b[31;1m[ERROR] {}\x1b[0m", msg))
 	}
 }

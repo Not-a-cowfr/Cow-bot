@@ -3,20 +3,28 @@ use std::fs;
 
 // #weloveduplicatingcode
 pub trait ExpectError<T> {
-	fn expect_error(self, msg: &str) -> T;
+	fn expect_error(
+		self,
+		msg: &str,
+	) -> T;
 }
 
 impl<T, E: std::fmt::Debug> ExpectError<T> for Result<T, E> {
-	fn expect_error(self, msg: &str) -> T {
+	fn expect_error(
+		self,
+		msg: &str,
+	) -> T {
 		self.expect(&format!("\x1b[31;1m[ERROR] {}\x1b[0m", msg))
 	}
 }
 
+// todo: add support for subdirectories in src/commands/
 fn main() {
 	let mut module_entries: HashSet<String> = HashSet::new();
 	let mut function_entries = vec![];
 
-	for entry in fs::read_dir("src/commands").expect_error("Failed to read src/commands/ directory") {
+	for entry in fs::read_dir("src/commands").expect_error("Failed to read src/commands/ directory")
+	{
 		if let Ok(entry) = entry {
 			let path = entry.path();
 			if path.extension().map_or(false, |ext| ext == "rs") {
