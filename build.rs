@@ -1,11 +1,22 @@
 use std::collections::HashSet;
 use std::fs;
 
+// #weloveduplicatingcode
+pub trait ExpectError<T> {
+	fn expect_error(self, msg: &str) -> T;
+}
+
+impl<T, E: std::fmt::Debug> ExpectError<T> for Result<T, E> {
+	fn expect_error(self, msg: &str) -> T {
+		self.expect(&format!("\x1b[31;1m[ERROR] {}\x1b[0m", msg))
+	}
+}
+
 fn main() {
 	let mut module_entries: HashSet<String> = HashSet::new();
 	let mut function_entries = vec![];
 
-	for entry in fs::read_dir("src/commands").expect("\x1b[31;1m[ERROR] Failed to read src/commands/ directory\x1b[0m") {
+	for entry in fs::read_dir("src/commands").expect_error("Failed to read src/commands/ directory") {
 		if let Ok(entry) = entry {
 			let path = entry.path();
 			if path.extension().map_or(false, |ext| ext == "rs") {
@@ -33,5 +44,5 @@ fn main() {
 		function_entries.join(", ")
 	);
 
-	fs::write("src/commands/mod.rs", mod_content).expect("\x1b[31;1m[ERROR] Failed to write to mod.rs\x1b[0m");
+	fs::write("src/commands/mod.rs", mod_content).expect_error("Failed to write to mod.rs");
 }

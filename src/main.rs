@@ -47,12 +47,22 @@ async fn on_error(error: poise::FrameworkError<'_, Data, Error>) {
 	}
 }
 
+pub trait ExpectError<T> {
+	fn expect_error(self, msg: &str) -> T;
+}
+
+impl<T, E: std::fmt::Debug> ExpectError<T> for Result<T, E> {
+	fn expect_error(self, msg: &str) -> T {
+		self.expect(&format!("\x1b[31;1m[ERROR] {}\x1b[0m", msg))
+	}
+}
+
 #[tokio::main]
 async fn main() {
 	dotenv().ok();
 	env_logger::init();
 
-	let api_key = var("API_KEY").expect("\x1b[31;1m[ERROR] Missing `API_KEY` env var, please include this in the environment variables or features may not work\x1b[0m");
+	let api_key = var("API_KEY").expect_error("Missing `API_KEY` env var, please include this in the environment variables or features may not work");
 
 	let options = poise::FrameworkOptions {
 		commands: commands::get_all_commands(),
@@ -84,8 +94,8 @@ async fn main() {
 		..Default::default()
 	};
 
-	create_users_table().expect("\x1b[31;1m[ERROR] Failed to create database 'users'\x1b[0m\n\n");
-	create_uptime_table().expect("\x1b[31;1m[ERROR] Failed to create database 'uptime'\x1b[0m\n\n");
+	create_users_table().expect_error("Failed to create database 'users'\n\n");
+	create_uptime_table().expect_error("Failed to create database 'uptime'\n\n");
 
 	// create uptime db connection pool
 	let manager = SqliteConnectionManager::file("src/data/uptime.db")
@@ -120,7 +130,7 @@ async fn main() {
 	});
 
 	let token = var("BOT_TOKEN").expect(
-		"\x1b[31;1m[ERROR] Missing `BOT_TOKEN` env var, please include this in the environment variables\x1b[0m",
+		"\x1b[31;1m[ERROR] Missing `BOT_TOKEN` env var, please include this in the environment variables",
 	);
 	let intents =
 		serenity::GatewayIntents::non_privileged() | serenity::GatewayIntents::MESSAGE_CONTENT;
