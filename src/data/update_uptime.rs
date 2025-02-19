@@ -85,7 +85,7 @@ pub async fn update_uptime(api_key: &str) -> Result<(), Error> {
 					}
 				},
 				| Err(e) => {
-					if err_msg.to_string().contains("is not in a guild") {
+					if e.to_string().contains("is not in a guild") {
 						no_guild += 1;
 					}
 					continue;
