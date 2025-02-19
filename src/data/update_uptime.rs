@@ -8,7 +8,7 @@ use serenity::json::Value;
 
 use crate::commands::utils::get_account_from_anything;
 
-#[path = "../commands/uptime.rs"]
+#[path = "../commands/uptime_command.rs"]
 mod uptime;
 
 #[derive(Debug)]

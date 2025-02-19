@@ -1,12 +1,5 @@
 #![warn(clippy::str_to_string)]
 
-#[path = "commands/color.rs"]
-mod color;
-#[path = "commands/get_linked_account.rs"]
-mod get_linked_account;
-#[path = "commands/uptime.rs"]
-mod uptime;
-
 mod commands;
 
 #[path = "data/database.rs"]
@@ -30,7 +23,6 @@ mod types {
 	pub type Context<'a> = poise::Context<'a, super::Data, Error>;
 }
 
-// Custom user data passed to all command functions
 pub struct Data {
 	api_key:        String,
 	uptime_db_pool: Pool<SqliteConnectionManager>,
@@ -63,13 +55,9 @@ async fn main() {
 	let api_key = var("API_KEY").expect("\x1b[31;1m[ERROR] Missing `API_KEY` env var, please include this in the environment variables or features may not work\x1b[0m");
 
 	let options = poise::FrameworkOptions {
-		commands: vec![
-			get_linked_account::get_linked_account(),
-			uptime::uptime(),
-			color::color(),
-		],
+		commands: commands::get_all_commands(),
 		prefix_options: poise::PrefixFrameworkOptions {
-			prefix: Some(";".into()),
+			prefix: Some("-".into()),
 			edit_tracker: Some(Arc::new(poise::EditTracker::for_timespan(
 				Duration::from_secs(3600),
 			))),
@@ -86,14 +74,6 @@ async fn main() {
 				println!("[COMMAND] completed {}", ctx.command().qualified_name);
 			})
 		},
-		command_check: Some(|ctx| {
-			Box::pin(async move {
-				if ctx.author().id == 123456789 {
-					return Ok(false);
-				}
-				Ok(true)
-			})
-		}),
 		skip_checks_for_owners: false,
 		event_handler: |_ctx, event, _framework, _data| {
 			Box::pin(async move {
@@ -107,7 +87,7 @@ async fn main() {
 	create_users_table().expect("\x1b[31;1m[ERROR] Failed to create database 'users'\x1b[0m\n\n");
 	create_uptime_table().expect("\x1b[31;1m[ERROR] Failed to create database 'uptime'\x1b[0m\n\n");
 
-	// create uptime connection pool
+	// create uptime db connection pool
 	let manager = SqliteConnectionManager::file("src/data/uptime.db")
 		.with_flags(rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE);
 	let uptime_db_pool = Pool::new(manager).expect("Failed to create database pool");
