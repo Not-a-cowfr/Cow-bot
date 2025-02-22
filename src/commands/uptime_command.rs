@@ -3,14 +3,12 @@ use std::fmt;
 use std::time::Instant;
 
 use chrono::{DateTime, Duration, NaiveDateTime, TimeZone, Utc};
-use env_logger::builder;
 use futures::stream::StreamExt;
-use mongodb::action::Update;
 use mongodb::bson::oid::ObjectId;
 use mongodb::bson::{Document, doc};
 use bson::DateTime as BsonDateTime;
-use mongodb::options::{UpdateOneModel, WriteModel};
-use mongodb::{Client, Cursor};
+use mongodb::options::ReplaceOneModel;
+use mongodb::{Client, Collection, Cursor};
 use poise::CreateReply;
 use serde::{Deserialize, Serialize};
 use serenity::builder::CreateEmbed;
@@ -18,7 +16,6 @@ use serenity::json::Value;
 
 
 use crate::commands::utils::{get_account_from_anything, get_color};
-use crate::data::update_uptime::get_guild_uptime_data;
 use crate::{Context, Error};
 
 #[poise::command(slash_command)]
@@ -42,12 +39,12 @@ pub async fn uptime(
 			return Ok(());
 		},
 	};
-	println!("get username/uuid: {}", start.elapsed().as_millis());
+	println!("get username/uuid: {} ms", start.elapsed().as_millis());
 	start = Instant::now();
 	let time_window: i64 = window.unwrap_or(7);
 
 	let api_key = &ctx.data().api_key;
-	println!("get collection: {}", start.elapsed().as_millis());
+	println!("get collection: {} ms", start.elapsed().as_millis());
 	start = Instant::now();
 
 	let uptime_data = match get_uptime(api_key, uuid, time_window, ctx.data().mongo_client.clone()).await {
@@ -77,7 +74,7 @@ pub async fn uptime(
 		};
 		description.push_str(&format!("{}: {}\n", date, uptime_str));
 	}
-	println!("generate description: {}", start.elapsed().as_millis());
+	println!("generate description: {} ms", start.elapsed().as_millis());
 	start = Instant::now();
 
 	let color = get_color(&ctx.author().name);
@@ -85,12 +82,12 @@ pub async fn uptime(
 		.title(format!("Uptime for {}", username))
 		.description(description)
 		.color(color);
-	println!("make embed: {}", start.elapsed().as_millis());
+	println!("make embed: {} ms", start.elapsed().as_millis());
 	start = Instant::now();
 
 	ctx.send(CreateReply::default().embed(embed)).await?;
 	log::info!("time taken: {:?}", start.elapsed());
-	println!("reply: {}", start.elapsed().as_millis());
+	println!("reply: {} ms", start.elapsed().as_millis());
 	Ok(())
 }
 
@@ -113,7 +110,7 @@ async fn get_uptime(
 ) -> Result<Vec<(String, i64)>, mongodb::error::Error> {
 	let mut start = Instant::now();
 	update_uptime(uuid.clone(), api_key, client.clone()).await.unwrap();
-	println!("update uptime: {}", start.elapsed().as_millis());
+	println!("update uptime: {} ms", start.elapsed().as_millis());
 	start = Instant::now();
 
 	let date: DateTime<Utc> = Utc::now();
@@ -132,7 +129,7 @@ async fn get_uptime(
 		let date_str: String = playtime.date.to_string();
 		results.push((date_str, playtime.gexp as i64));
 	}
-	println!("get uptime results: {}", start.elapsed().as_millis());
+	println!("get uptime results: {} ms", start.elapsed().as_millis());
 
 	Ok(results)
 }
@@ -195,7 +192,7 @@ async fn get_guild_uptime_data(
 	let url = format!("https://api.hypixel.net/v2/guild?key={api_key}&player={uuid}");
 
 	let response = reqwest::get(&url).await?;
-	println!("get guild data: {}", start.elapsed().as_millis());
+	println!("get guild data: {} ms", start.elapsed().as_millis());
 	start = Instant::now();
 	let response_text = response.text().await?;
 	let guild_response: GuildResponse = serde_json::from_str(&response_text)?;
@@ -203,7 +200,7 @@ async fn get_guild_uptime_data(
 	let guild = guild_response
 		.guild
 		.ok_or_else(|| ApiError::NoGuild(uuid.clone()))?;
-	println!("parse data: {}", start.elapsed().as_millis());
+	println!("parse data: {} ms", start.elapsed().as_millis());
 	start = Instant::now();
 
 	let mut guild_uptime_data = HashMap::new();
@@ -219,7 +216,7 @@ async fn get_guild_uptime_data(
 		}
 		guild_uptime_data.insert(member.uuid, uptime_history);
 	}
-	println!("return data: {}", start.elapsed().as_millis());
+	println!("return data: {} ms", start.elapsed().as_millis());
 
 	Ok((guild._id, guild_uptime_data))
 }
@@ -233,6 +230,7 @@ pub async fn update_uptime(
         get_guild_uptime_data(api_key, uuid.clone()).await.unwrap();
 
     let mut models = Vec::new();
+	let collection: Collection<Uptime> = client.database("Players").collection("Uptime");
 
     for (uuid, uptime_history) in member_uptime_history {
         for (unformatted_date, new_gexp) in uptime_history {
@@ -247,18 +245,21 @@ pub async fn update_uptime(
             };
 
             let update = doc! {
-                "$set": {
-                    "gexp": new_gexp,
-                    "guild_id": guild_id.clone(),
-                }
+				"_id": ObjectId::new(),
+                "uuid": uuid.clone(),
+				"gexp": new_gexp,
+				"date": date,
+				"guild_id": guild_id.clone(),
             };
 
-            models.push(WriteModel::UpdateOne(UpdateOneModel {
-				filter: filter,
-				update: update,
-				upsert: Some(true),
-				..Default::default()
-			}));
+			let model = ReplaceOneModel::builder()
+					.namespace(collection.namespace())
+					.filter(filter)
+					.replacement(update)
+					.upsert(true)
+					.build();
+
+            models.push(model);
         }
     }
 
