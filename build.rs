@@ -22,7 +22,8 @@ fn main() {
 	let mut module_entries: BTreeSet<String> = BTreeSet::new();
 	let mut function_entries = vec![];
 
-	for entry in std::fs::read_dir("src/commands").expect_error("Failed to read src/commands/ directory")
+	for entry in
+		std::fs::read_dir("src/commands").expect_error("Failed to read src/commands/ directory")
 	{
 		if let Ok(entry) = entry {
 			let path = entry.path();
@@ -32,14 +33,10 @@ fn main() {
 						continue;
 					}
 
-					if filename.ends_with("_command") {
-						module_entries.insert(format!("mod {};", filename));
+					module_entries.insert(format!("pub mod {};", filename));
 						if let Some(command_name) = filename.strip_suffix("_command") {
 							function_entries.push(format!("{}::{}()", filename, command_name));
 						}
-					} else {
-						module_entries.insert(format!("pub mod {};", filename));
-					}
 				}
 			}
 		}

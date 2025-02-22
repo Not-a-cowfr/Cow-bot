@@ -5,11 +5,10 @@ use std::env::var;
 use std::sync::Arc;
 use std::time::Duration;
 
-use data::database::{create_uptime_table, create_users_table};
 use dotenv::dotenv;
+use mongodb::Client;
+use mongodb::options::ClientOptions;
 use poise::serenity_prelude as serenity;
-use r2d2::Pool;
-use r2d2_sqlite::SqliteConnectionManager;
 use types::{Context, Error};
 
 mod types {
@@ -18,14 +17,16 @@ mod types {
 }
 
 pub struct Data {
-	api_key:        String,
-	uptime_db_pool: Pool<SqliteConnectionManager>,
-	error_color:    u32,
+	api_key:      String,
+	mongo_client: Client,
+	error_color:  u32,
 }
 
 async fn on_error(error: poise::FrameworkError<'_, Data, Error>) {
 	match error {
-		| poise::FrameworkError::Setup { error, .. } => panic!("Failed to start bot: {:?}", error),
+		| poise::FrameworkError::Setup { error, .. } => {
+			panic!("\x1b[31;1m[ERROR] Failed to start bot:\x1b[0m {:?}", error)
+		},
 		| poise::FrameworkError::Command { error, ctx, .. } => {
 			println!(
 				"\x1b[31;1m[ERROR] in command '{}':\x1b[0m {:?}",
@@ -95,13 +96,14 @@ async fn main() {
 		..Default::default()
 	};
 
-	create_users_table().expect_error("Failed to create database 'users'\n\n");
-	create_uptime_table().expect_error("Failed to create database 'uptime'\n\n");
+	let mongo_options = ClientOptions::parse(
+		var("MONGO_URL").expect_error("MONGO_URL environment variable is missing!"),
+	)
+	.await
+	.expect_error("Could not create mongo client options!");
+	let client = Client::with_options(mongo_options).expect_error("Could not create mongo client!");
 
-	// create uptime db connection pool
-	let manager = SqliteConnectionManager::file("src/data/uptime.db")
-		.with_flags(rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE);
-	let uptime_db_pool = Pool::new(manager).expect("Failed to create database pool");
+	data::database::create_users_table().expect_error("Failed to create database \'users\'");
 
 	let clone_api_key = api_key.clone();
 	let framework = poise::Framework::builder()
@@ -110,16 +112,16 @@ async fn main() {
 				println!("Logged in as {}", _ready.user.name);
 				poise::builtins::register_globally(ctx, &framework.options().commands).await?;
 				Ok(Data {
-					api_key: clone_api_key,
-					uptime_db_pool,
-					error_color: 0x383838,
+					api_key:      clone_api_key,
+					mongo_client: client,
+					error_color:  0x770505,
 				})
 			})
 		})
 		.options(options)
 		.build();
 
-	tokio::task::spawn_blocking(move || {
+	/*tokio::task::spawn_blocking(move || {
 		if let Err(err) =
 			tokio::runtime::Handle::current().block_on(data::update_uptime::update_uptime(&api_key))
 		{
@@ -128,7 +130,7 @@ async fn main() {
 				err
 			);
 		}
-	});
+	});*/
 
 	let token = var("BOT_TOKEN").expect(
 		"\x1b[31;1m[ERROR] Missing `BOT_TOKEN` env var, please include this in your .env file",

@@ -1,12 +1,21 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
+use std::fmt;
 use std::time::Instant;
 
-use chrono::{Duration, Utc};
+use chrono::{DateTime, Duration, NaiveDateTime, TimeZone, Utc};
+use env_logger::builder;
+use futures::stream::StreamExt;
+use mongodb::action::Update;
+use mongodb::bson::oid::ObjectId;
+use mongodb::bson::{Document, doc};
+use bson::DateTime as BsonDateTime;
+use mongodb::options::{UpdateOneModel, WriteModel};
+use mongodb::{Client, Cursor};
 use poise::CreateReply;
-use r2d2::Pool;
-use r2d2_sqlite::SqliteConnectionManager;
-use rusqlite::params;
+use serde::{Deserialize, Serialize};
 use serenity::builder::CreateEmbed;
+use serenity::json::Value;
+
 
 use crate::commands::utils::{get_account_from_anything, get_color};
 use crate::data::update_uptime::get_guild_uptime_data;
@@ -38,62 +47,26 @@ pub async fn uptime(
 	let time_window: i64 = window.unwrap_or(7);
 
 	let api_key = &ctx.data().api_key;
-	let pool = &ctx.data().uptime_db_pool;
-	println!("get pool: {}", start.elapsed().as_millis());
+	println!("get collection: {}", start.elapsed().as_millis());
 	start = Instant::now();
 
-	let uptime_data = match get_uptime(&uuid, time_window, pool).await {
-		| Ok(data) => {
-			println!(
-				"Fetched uptime successfully: {} ms",
-				start.elapsed().as_millis()
-			);
-			start = Instant::now();
-			data
-		},
-		| Err(_) => {
-			println!(
-				"Failed to fetch uptime, attempting to update uptime: {} ms",
-				start.elapsed().as_millis()
-			);
-			start = Instant::now();
-			match update_uptime(api_key, uuid.clone(), pool).await {
-				| Ok(_) => {
-					println!(
-						"Uptime updated successfully: {} ms",
-						start.elapsed().as_millis()
-					);
-					start = Instant::now();
-					match get_uptime(&uuid, time_window, pool).await {
-						| Ok(data) => {
-							println!(
-								"Fetched uptime after update: {} ms",
-								start.elapsed().as_millis()
-							);
-							start = Instant::now();
-							data
-						},
-						| Err(_) => {
-							println!(
-								"Failed to fetch uptime after update, trying with unknown: {} ms",
-								start.elapsed().as_millis()
-							);
-							start = Instant::now();
-							get_uptime_with_unknown(&uuid, time_window, pool).await?
-						},
-					}
-				},
-				| Err(_) => {
-					println!(
-						"Failed to update uptime, trying with unknown: {} ms",
-						start.elapsed().as_millis()
-					);
-					start = Instant::now();
-					get_uptime_with_unknown(&uuid, time_window, pool).await?
-				},
-			}
+	let uptime_data = match get_uptime(api_key, uuid, time_window, ctx.data().mongo_client.clone()).await {
+		| Ok(uptime_data) => uptime_data,
+		| Err(e) => {
+			println!("{}", e);
+			let embed = CreateEmbed::default()
+				.title("Unexpected Error occured")
+				.description(e.to_string())
+				.color(ctx.data().error_color);
+			ctx.send(CreateReply::default().embed(embed)).await?;
+			return Ok(());
 		},
 	};
+	println!(
+		"Fetched uptime successfully: {} ms",
+		start.elapsed().as_millis()
+	);
+	start = Instant::now();
 
 	let mut description = String::new();
 	for (date, gexp) in uptime_data {
@@ -121,110 +94,182 @@ pub async fn uptime(
 	Ok(())
 }
 
-#[allow(dead_code)]
-async fn get_uptime_with_unknown(
-	uuid: &str,
-	time_window: i64,
-	pool: &Pool<SqliteConnectionManager>,
-) -> Result<Vec<(String, i64)>, Error> {
-	let conn = pool.get()?;
-	let current_date = Utc::now().date_naive();
-	let mut results = Vec::with_capacity(time_window as usize);
-
-	let mut stmt = conn.prepare(
-		"SELECT date, gexp FROM uptime
-         WHERE uuid = ? AND date >= date('now', '-' || (? - 1) || ' days')
-         ORDER BY date DESC",
-	)?;
-
-	let mut date_to_gexp = HashMap::new();
-	for row in stmt.query_map(params![uuid, time_window], |row| {
-		Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?))
-	})? {
-		let (date, gexp) = row?;
-		date_to_gexp.insert(date, gexp);
-	}
-
-	for days_ago in 0..time_window {
-		let date = (current_date - Duration::days(days_ago))
-			.format("%Y-%m-%d")
-			.to_string();
-		results.push((date.clone(), *date_to_gexp.get(&date).unwrap_or(&-1)));
-	}
-
-	Ok(results)
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Uptime {
+	#[serde(rename = "_id", skip_serializing_if = "Option::is_none")]
+	id:       Option<ObjectId>,
+	uuid:     String,
+	gexp:     i64,
+	date:     BsonDateTime,
+	guild_id: String,
 }
 
 #[allow(dead_code)]
 async fn get_uptime(
-	uuid: &str,
+	api_key: &str,
+	uuid: String,
 	time_window: i64,
-	pool: &Pool<SqliteConnectionManager>,
-) -> Result<Vec<(String, i64)>, Error> {
-	let conn = pool.get()?;
-	let mut stmt = conn.prepare(
-		"SELECT date, gexp FROM uptime
-         WHERE uuid = ? AND date >= date('now', '-' || (? - 1) || ' days')
-         ORDER BY date DESC",
-	)?;
+	client: Client,
+) -> Result<Vec<(String, i64)>, mongodb::error::Error> {
+	let mut start = Instant::now();
+	update_uptime(uuid.clone(), api_key, client.clone()).await.unwrap();
+	println!("update uptime: {}", start.elapsed().as_millis());
+	start = Instant::now();
 
-	let rows = stmt.query_map(params![uuid, time_window], |row| {
-		Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?))
-	})?;
+	let date: DateTime<Utc> = Utc::now();
+	let start_date: BsonDateTime = BsonDateTime::from_chrono(date - Duration::days(time_window));
+	let filter: Document = doc! {
+		"uuid": uuid,
+		"date": { "$gte": start_date }
+	};
 
-	let mut results = Vec::new();
-	let mut found_dates = HashSet::new();
+	
+	let mut cursor: Cursor<Uptime> = client.database("Players").collection("Uptime").find(filter).await?;
+	let mut results: Vec<(String, i64)> = Vec::new();
 
-	for row in rows {
-		let (date, gexp) = row?;
-		found_dates.insert(date.clone());
-		results.push((date, gexp));
+	while let Some(result) = cursor.next().await {
+		let playtime: Uptime = result?;
+		let date_str: String = playtime.date.to_string();
+		results.push((date_str, playtime.gexp as i64));
 	}
-
-	if results.len() < time_window as usize {
-		return Err("Missing dates".into());
-	}
+	println!("get uptime results: {}", start.elapsed().as_millis());
 
 	Ok(results)
 }
 
-#[allow(dead_code)]
-async fn update_uptime(
-	api_key: &str,
-	uuid: String,
-	pool: &Pool<SqliteConnectionManager>,
-) -> Result<(), Error> {
-	let mut conn = pool.get()?;
-	let (guild_id, member_uptime_history) = get_guild_uptime_data(api_key, uuid.clone()).await?;
 
-	let tx = conn.transaction()?;
+#[derive(Debug)]
+pub enum ApiError {
+	Database(mongodb::error::Error),
+	Api(String),
+	NoGuild(String),
+}
 
-	for (player_uuid, uptime_history) in member_uptime_history {
-		for (date, gexp) in uptime_history {
-			tx.execute(
-				"UPDATE uptime
-                    SET guild_id = ?1, gexp = ?3
-                    WHERE uuid = ?2 AND date = ?4",
-				params![guild_id, player_uuid, gexp, date],
-			)?;
+impl std::error::Error for ApiError {}
 
-			tx.execute(
-				"INSERT INTO uptime (guild_id, uuid, gexp, date)
-                    SELECT ?1, ?2, ?3, ?4
-                    WHERE NOT EXISTS (
-                        SELECT 1 FROM uptime WHERE uuid = ?2 AND date = ?4
-                    )",
-				params![guild_id, player_uuid, gexp, date],
-			)?;
+impl fmt::Display for ApiError {
+	fn fmt(
+		&self,
+		f: &mut fmt::Formatter<'_>,
+	) -> fmt::Result {
+		match self {
+			| ApiError::Database(e) => write!(f, "Database error: {}", e),
+			| ApiError::Api(msg) => write!(f, "API error: {}", msg),
+			| ApiError::NoGuild(uuid) => write!(f, "Player {} is not in a guild", uuid),
 		}
 	}
+}
 
-	tx.commit()?;
+impl From<mongodb::error::Error> for ApiError {
+	fn from(err: mongodb::error::Error) -> ApiError { ApiError::Database(err) }
+}
 
-	Ok(())
+impl From<Box<dyn std::error::Error + Send + Sync>> for ApiError {
+	fn from(err: Box<dyn std::error::Error + Send + Sync>) -> ApiError { ApiError::Api(err.to_string()) }
+}
+
+#[derive(Deserialize)]
+struct GuildResponse {
+	guild: Option<Guild>,
+}
+
+#[derive(Clone, Deserialize)]
+struct Guild {
+	members: Vec<Member>,
+	_id:     String,
+}
+
+#[derive(Clone, Deserialize)]
+#[allow(non_snake_case)]
+struct Member {
+	uuid:       String,
+	expHistory: Option<Value>,
+}
+
+async fn get_guild_uptime_data(
+	api_key: &str,
+	uuid: String,
+) -> Result<(String, HashMap<String, HashMap<String, i64>>), Box<dyn std::error::Error + Send + Sync>>
+{
+	let mut start = Instant::now();
+	let url = format!("https://api.hypixel.net/v2/guild?key={api_key}&player={uuid}");
+
+	let response = reqwest::get(&url).await?;
+	println!("get guild data: {}", start.elapsed().as_millis());
+	start = Instant::now();
+	let response_text = response.text().await?;
+	let guild_response: GuildResponse = serde_json::from_str(&response_text)?;
+
+	let guild = guild_response
+		.guild
+		.ok_or_else(|| ApiError::NoGuild(uuid.clone()))?;
+	println!("parse data: {}", start.elapsed().as_millis());
+	start = Instant::now();
+
+	let mut guild_uptime_data = HashMap::new();
+
+	for member in guild.members {
+		let mut uptime_history = HashMap::new();
+
+		if let Some(ref exp_history) = member.expHistory {
+			for (date, xp) in exp_history.as_object().unwrap() {
+				let xp_value = xp.as_i64().unwrap();
+				uptime_history.insert(date.to_string(), xp_value);
+			}
+		}
+		guild_uptime_data.insert(member.uuid, uptime_history);
+	}
+	println!("return data: {}", start.elapsed().as_millis());
+
+	Ok((guild._id, guild_uptime_data))
+}
+
+pub async fn update_uptime(
+    uuid: String,
+    api_key: &str,
+    client: Client,
+) -> Result<(), mongodb::error::Error> {
+    let (guild_id, member_uptime_history) =
+        get_guild_uptime_data(api_key, uuid.clone()).await.unwrap();
+
+    let mut models = Vec::new();
+
+    for (uuid, uptime_history) in member_uptime_history {
+        for (unformatted_date, new_gexp) in uptime_history {
+            let formatted_date = format!("{} 00:00:00", unformatted_date);
+            let naive_date = NaiveDateTime::parse_from_str(&formatted_date, "%Y-%m-%d %H:%M:%S")
+                .expect("Failed to parse date");
+            let date = BsonDateTime::from_chrono(Utc.from_utc_datetime(&naive_date));
+
+            let filter = doc! {
+                "uuid": uuid.clone(),
+                "date": &date,
+            };
+
+            let update = doc! {
+                "$set": {
+                    "gexp": new_gexp,
+                    "guild_id": guild_id.clone(),
+                }
+            };
+
+            models.push(WriteModel::UpdateOne(UpdateOneModel {
+				filter: filter,
+				update: update,
+				upsert: Some(true),
+				..Default::default()
+			}));
+        }
+    }
+
+    if !models.is_empty() {
+        client.bulk_write(models).await?;
+    }
+
+    Ok(())
 }
 
 #[allow(dead_code)]
-pub fn gexp_to_uptime_as_string(gexp: i64) -> String {
+fn gexp_to_uptime_as_string(gexp: i64) -> String {
 	format!("{}h {}m", gexp / 9000, (gexp % 9000) / 150)
 }

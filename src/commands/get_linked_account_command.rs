@@ -30,7 +30,7 @@ pub async fn get_linked_account(
 	let embed = CreateEmbed::default()
         .title(format!("Player information for **{username}**"))
         .description(format!(
-            "Username: **{username}**\nUUID: `{uuid}`\n\n<https://elitebot.dev/@{username}>\n\n<https://sky.shiiyu.moe/stats/{username}>"
+            "Username: **{username}**\nUUID: `{uuid}`\n\n<https://elitebot.dev/@{username}>\n\n<https://cupcake.shiiyu.moe/stats/{username}>"
         ))
         .color(color);
 
