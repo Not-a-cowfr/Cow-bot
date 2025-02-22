@@ -7,7 +7,6 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use data::database::create_users_table;
-use dotenv::dotenv;
 use mongodb::Client;
 use mongodb::options::ClientOptions;
 use poise::serenity_prelude as serenity;
@@ -88,9 +87,6 @@ impl<T, E: std::fmt::Debug> ExpectError<T> for Result<T, E> {
 
 #[tokio::main]
 async fn main() {
-	dotenv().ok();
-	env_logger::init();
-
 	let options = poise::FrameworkOptions {
 		commands: commands::get_all_commands(),
 		prefix_options: poise::PrefixFrameworkOptions {
