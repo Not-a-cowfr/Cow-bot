@@ -18,10 +18,10 @@ pub async fn uptime(
 	#[description = "Username, UUID, or discord ID"] user: Option<String>,
 	#[description = "Time window, eg 7 for 7 days"] window: Option<i64>,
 ) -> Result<(), Error> {
+	let start = Instant::now();
 	ctx.defer().await?;
 
 	let user_input = user.unwrap_or_else(|| ctx.author().id.to_string());
-	let mut start = Instant::now();
 	let (username, uuid) = match get_account_from_anything(&user_input).await {
 		| Ok(result) => result,
 		| Err(_e) => {
@@ -33,12 +33,7 @@ pub async fn uptime(
 			return Ok(());
 		},
 	};
-	println!("get username/uuid: {} ms", start.elapsed().as_millis());
-	start = Instant::now();
 	let time_window: i64 = window.unwrap_or(7);
-
-	println!("get collection: {} ms", start.elapsed().as_millis());
-	start = Instant::now();
 
 	let collection = MONGO_CLIENT.get().expect("MongoDB client is uninitalized").clone().database("Players").collection("Uptime");
 	let uptime_data = match get_uptime(uuid, time_window, collection).await {
@@ -53,11 +48,6 @@ pub async fn uptime(
 			return Ok(());
 		},
 	};
-	println!(
-		"Fetched uptime successfully: {} ms",
-		start.elapsed().as_millis()
-	);
-	start = Instant::now();
 
 	let mut description = String::new();
 	for (date, gexp) in uptime_data {
@@ -68,20 +58,15 @@ pub async fn uptime(
 		};
 		description.push_str(&format!("{}: {}\n", date, uptime_str));
 	}
-	println!("generate description: {} ms", start.elapsed().as_millis());
-	start = Instant::now();
 
 	let color = get_color(&ctx.author().name);
 	let embed = CreateEmbed::default()
 		.title(format!("Uptime for {}", username))
 		.description(description)
 		.color(color);
-	println!("make embed: {} ms", start.elapsed().as_millis());
-	start = Instant::now();
 
 	ctx.send(CreateReply::default().embed(embed)).await?;
-	log::info!("time taken: {:?}", start.elapsed());
-	println!("reply: {} ms", start.elapsed().as_millis());
+	println!("time taken: {} ms", start.elapsed().as_millis());
 	Ok(())
 }
 
@@ -96,7 +81,6 @@ async fn get_uptime(
 		"uuid": uuid,
 		"date": { "$gte": start_date }
 	};
-
 	
 	let mut cursor: Cursor<Uptime> = collection.find(filter).await?;
 	let mut results: Vec<(String, i64)> = Vec::new();

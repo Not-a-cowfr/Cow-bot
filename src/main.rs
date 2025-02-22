@@ -7,11 +7,11 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use data::database::create_users_table;
-use tasks::update_uptime::uptime_updater;
 use dotenv::dotenv;
 use mongodb::Client;
 use mongodb::options::ClientOptions;
 use poise::serenity_prelude as serenity;
+use tasks::update_uptime::uptime_updater;
 use tokio::sync::OnceCell;
 use types::{Context, Error};
 
@@ -135,9 +135,14 @@ async fn main() {
 		.build();
 
 	tokio::task::spawn_blocking(move || {
-		if let Err(err) =
-			tokio::runtime::Handle::current().block_on(uptime_updater(&API_KEY.get().unwrap(), MONGO_CLIENT.get().unwrap().database("Players").collection("Uptime")))
-		{
+		if let Err(err) = tokio::runtime::Handle::current().block_on(uptime_updater(
+			&API_KEY.get().unwrap(),
+			MONGO_CLIENT
+				.get()
+				.unwrap()
+				.database("Players")
+				.collection("Uptime"),
+		)) {
 			eprintln!(
 				"\x1b[31;1m[ERROR] Error in uptime tracker:\x1b[0m\n\n{:?}",
 				err

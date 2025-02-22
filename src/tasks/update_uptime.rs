@@ -1,8 +1,12 @@
-use std::{collections::HashMap, fmt, time::Duration};
+use std::collections::HashMap;
+use std::fmt;
+use std::time::Duration;
 
-use bson::{doc, oid::ObjectId, DateTime as BsonDateTime, Document};
+use bson::oid::ObjectId;
+use bson::{DateTime as BsonDateTime, Document, doc};
 use chrono::{NaiveDateTime, TimeZone, Utc};
-use mongodb::{options::ReplaceOneModel, Client, Collection};
+use mongodb::options::ReplaceOneModel;
+use mongodb::{Client, Collection};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -18,12 +22,15 @@ pub struct Uptime {
 	pub guild_id: String,
 }
 
-pub async fn uptime_updater(api_key: &str, collection: Collection<Uptime>) -> Result<(), ApiError> {
+pub async fn uptime_updater(
+	api_key: &str,
+	collection: Collection<Uptime>,
+) -> Result<(), ApiError> {
 	loop {
 		let client = MONGO_CLIENT.get().unwrap();
 
 		let players: Vec<String> = collection
-			.distinct("uuid",  Document::new())
+			.distinct("uuid", Document::new())
 			.await?
 			.into_iter()
 			.filter_map(|bson_value| bson_value.as_str().map(String::from))
@@ -39,8 +46,8 @@ pub async fn uptime_updater(api_key: &str, collection: Collection<Uptime>) -> Re
 			}
 
 			match update_uptime(player.clone(), api_key, client.clone()).await {
-				Err(ApiError::NoGuild(_)) => no_guild += 1,
-				_ => {},
+				| Err(ApiError::NoGuild(_)) => no_guild += 1,
+				| _ => {},
 			};
 
 			processed_uuids.push(player);
@@ -83,7 +90,9 @@ impl From<mongodb::error::Error> for ApiError {
 }
 
 impl From<Box<dyn std::error::Error + Send + Sync>> for ApiError {
-	fn from(err: Box<dyn std::error::Error + Send + Sync>) -> ApiError { ApiError::Api(err.to_string()) }
+	fn from(err: Box<dyn std::error::Error + Send + Sync>) -> ApiError {
+		ApiError::Api(err.to_string())
+	}
 }
 
 #[derive(Deserialize)]
@@ -137,52 +146,53 @@ async fn get_guild_uptime_data(
 }
 
 pub async fn update_uptime(
-    uuid: String,
-    api_key: &str,
-    client: Client,
+	uuid: String,
+	api_key: &str,
+	client: Client,
 ) -> Result<(), ApiError> {
-    let (guild_id, member_uptime_history) = match get_guild_uptime_data(api_key, uuid.clone()).await {
-		Ok(result) => result,
-		Err(_) => return Err(ApiError::NoGuild(uuid)),
+	let (guild_id, member_uptime_history) = match get_guild_uptime_data(api_key, uuid.clone()).await
+	{
+		| Ok(result) => result,
+		| Err(_) => return Err(ApiError::NoGuild(uuid)),
 	};
 
-    let mut models = Vec::new();
+	let mut models = Vec::new();
 	let collection: Collection<Uptime> = client.database("Players").collection("Uptime");
 
-    for (uuid, uptime_history) in member_uptime_history {
-        for (unformatted_date, new_gexp) in uptime_history {
-            let formatted_date = format!("{} 00:00:00", unformatted_date);
-            let naive_date = NaiveDateTime::parse_from_str(&formatted_date, "%Y-%m-%d %H:%M:%S")
-                .expect("Failed to parse date");
-            let date = BsonDateTime::from_chrono(Utc.from_utc_datetime(&naive_date));
+	for (uuid, uptime_history) in member_uptime_history {
+		for (unformatted_date, new_gexp) in uptime_history {
+			let formatted_date = format!("{} 00:00:00", unformatted_date);
+			let naive_date = NaiveDateTime::parse_from_str(&formatted_date, "%Y-%m-%d %H:%M:%S")
+				.expect("Failed to parse date");
+			let date = BsonDateTime::from_chrono(Utc.from_utc_datetime(&naive_date));
 
-            let filter = doc! {
-                "uuid": uuid.clone(),
-                "date": &date,
-            };
+			let filter = doc! {
+				"uuid": uuid.clone(),
+				"date": &date,
+			};
 
-            let update = doc! {
+			let update = doc! {
 				"_id": ObjectId::new(),
-                "uuid": uuid.clone(),
+				"uuid": uuid.clone(),
 				"gexp": new_gexp,
 				"date": date,
 				"guild_id": guild_id.clone(),
-            };
+			};
 
 			let model = ReplaceOneModel::builder()
-					.namespace(collection.namespace())
-					.filter(filter)
-					.replacement(update)
-					.upsert(true)
-					.build();
+				.namespace(collection.namespace())
+				.filter(filter)
+				.replacement(update)
+				.upsert(true)
+				.build();
 
-            models.push(model);
-        }
-    }
+			models.push(model);
+		}
+	}
 
-    if !models.is_empty() {
-        client.bulk_write(models).await?;
-    }
+	if !models.is_empty() {
+		client.bulk_write(models).await?;
+	}
 
-    Ok(())
+	Ok(())
 }
