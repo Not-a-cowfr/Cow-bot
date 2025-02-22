@@ -20,12 +20,11 @@ mod types {
 	pub type Context<'a> = poise::Context<'a, super::Data, Error>;
 }
 
-pub struct Data {
-	error_color: u32,
-}
+pub struct Data {}
 
 static MONGO_CLIENT: OnceCell<Client> = OnceCell::const_new();
 static API_KEY: OnceCell<String> = OnceCell::const_new();
+static ERROR_COLOR: OnceCell<u32> = OnceCell::const_new();
 
 async fn init_global_data() {
 	API_KEY
@@ -44,7 +43,11 @@ async fn init_global_data() {
 
 	MONGO_CLIENT
 		.set(client)
-		.expect_error("MongoDB client can only be initialized once");
+		.expect_error("MONGO_CLIENT can only be initialized once");
+
+	ERROR_COLOR
+		.set(0x770505)
+		.expect_error("ERROR_COLOR can only be initialized once")
 }
 
 async fn on_error(error: poise::FrameworkError<'_, Data, Error>) {
@@ -126,9 +129,7 @@ async fn main() {
 			Box::pin(async move {
 				println!("Logged in as {}", _ready.user.name);
 				poise::builtins::register_globally(ctx, &framework.options().commands).await?;
-				Ok(Data {
-					error_color: 0x770505,
-				})
+				Ok(Data {})
 			})
 		})
 		.options(options)

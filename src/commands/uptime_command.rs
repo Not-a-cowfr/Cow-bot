@@ -9,7 +9,7 @@ use mongodb::{Client, Cursor};
 use poise::CreateReply;
 use serenity::builder::CreateEmbed;
 
-use crate::commands::utils::{get_account_from_anything, get_color};
+use crate::commands::utils::{create_error_embed, get_account_from_anything, get_color};
 use crate::tasks::update_uptime::{ApiError, Uptime, update_uptime};
 use crate::{Context, Error, API_KEY, MONGO_CLIENT};
 
@@ -26,10 +26,7 @@ pub async fn uptime(
 	let (username, uuid) = match get_account_from_anything(&user_input).await {
 		| Ok(result) => result,
 		| Err(_e) => {
-			let embed = CreateEmbed::default()
-				.title("Error")
-				.description("No linked account found")
-				.color(ctx.data().error_color);
+			let embed = create_error_embed("No linked account found");
 			ctx.send(CreateReply::default().embed(embed)).await?;
 			return Ok(());
 		},
@@ -41,16 +38,13 @@ pub async fn uptime(
 		| Ok(uptime_data) => uptime_data,
 		| Err(e) => {
 			println!("{}", e);
-			let embed = CreateEmbed::default()
-				.title("Unexpected Error occured")
-				.description(e.to_string())
-				.color(ctx.data().error_color);
+			let embed = create_error_embed(&e.to_string());
 			ctx.send(CreateReply::default().embed(embed)).await?;
 			return Ok(());
 		},
 	};
 
-	let mut description = String::new();
+	let mut description = String::with_capacity(2_000);
 	for (date, gexp) in uptime_data {
 		let uptime_str = if gexp >= 0 {
 			gexp_to_uptime_as_string(gexp)

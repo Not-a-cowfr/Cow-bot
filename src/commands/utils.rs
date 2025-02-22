@@ -1,7 +1,8 @@
 use rusqlite::{Connection, Result, params};
 use serde::Deserialize;
+use serenity::all::CreateEmbed;
 
-use crate::types::Error;
+use crate::{types::Error, ERROR_COLOR};
 
 fn get_color_backend(username: &str) -> Result<Option<String>> {
 	let conn = Connection::open("src/data/users.db")?;
@@ -104,4 +105,11 @@ pub async fn get_linked_elite_account(discord_id: String) -> Result<(String, Str
 
     let account: MojangResponse = serde_json::from_str(&body)?;
     Ok((account.name, account.id))
+}
+
+pub fn create_error_embed(description: &str) -> CreateEmbed {
+    CreateEmbed::default()
+        .title("Error")
+        .description(description)
+        .color(*ERROR_COLOR.get().expect("ERROR_COLOR is uninitialized"))
 }

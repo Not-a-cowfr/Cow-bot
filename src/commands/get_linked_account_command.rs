@@ -1,7 +1,7 @@
 use poise::CreateReply;
 use serenity::all::{CreateEmbed, User};
 
-use crate::commands::utils::{get_account_from_anything, get_color};
+use crate::commands::utils::{create_error_embed, get_account_from_anything, get_color};
 use crate::{Context, Error};
 
 #[poise::command(
@@ -16,10 +16,7 @@ pub async fn get_linked_account(
 	let (username, uuid) = match get_account_from_anything(&user.id.to_string()).await {
 		| Ok(result) => result,
 		| Err(_e) => {
-			let embed = CreateEmbed::default()
-				.title("Error")
-				.description("No linked account found")
-				.color(ctx.data().error_color);
+			let embed = create_error_embed("No linked account found");
 			ctx.send(CreateReply::default().embed(embed)).await?;
 			return Ok(());
 		},
