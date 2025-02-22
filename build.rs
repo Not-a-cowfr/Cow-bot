@@ -22,7 +22,8 @@ fn main() {
 	let mut module_entries: BTreeSet<String> = BTreeSet::new();
 	let mut function_entries = vec![];
 
-	for entry in std::fs::read_dir("src/commands").expect_error("Failed to read src/commands/ directory")
+	for entry in
+		std::fs::read_dir("src/commands").expect_error("Failed to read src/commands/ directory")
 	{
 		if let Ok(entry) = entry {
 			let path = entry.path();

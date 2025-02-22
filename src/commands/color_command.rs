@@ -4,6 +4,8 @@ use serenity::all::CreateEmbed;
 
 use crate::{Context, Error};
 
+use super::utils::create_error_embed;
+
 #[poise::command(slash_command)]
 pub async fn color(
 	ctx: Context<'_>,
@@ -16,10 +18,7 @@ pub async fn color(
 	let color = color.replace("#", "");
 
 	if !color.chars().all(|c| c.is_digit(16)) || color.len() != 6 {
-		let embed = CreateEmbed::default()
-			.title("Error")
-			.description("Invalid hex code. Please provide a valid 6-character hex code.")
-			.color(ctx.data().error_color);
+		let embed = create_error_embed("Invalid hex code. Please provide a valid 6-character hex code.");
 		ctx.send(CreateReply::default().embed(embed)).await?;
 		return Ok(());
 	}

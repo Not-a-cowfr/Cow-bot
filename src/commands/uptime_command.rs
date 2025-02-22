@@ -1,16 +1,17 @@
-use std::collections::{HashMap, HashSet};
+use std::pin::Pin;
 use std::time::Instant;
 
-use chrono::{Duration, Utc};
+use chrono::{DateTime, Duration, Utc};
+use futures::stream::StreamExt;
+use mongodb::bson::{Document, doc};
+use bson::DateTime as BsonDateTime;
+use mongodb::{Client, Cursor};
 use poise::CreateReply;
-use r2d2::Pool;
-use r2d2_sqlite::SqliteConnectionManager;
-use rusqlite::params;
 use serenity::builder::CreateEmbed;
 
-use crate::commands::utils::{get_account_from_anything, get_color};
-use crate::data::update_uptime::get_guild_uptime_data;
-use crate::{Context, Error};
+use crate::commands::utils::{create_error_embed, get_account_from_anything, get_color};
+use crate::tasks::update_uptime::{ApiError, Uptime, update_uptime};
+use crate::{Context, Error, API_KEY, MONGO_CLIENT};
 
 #[poise::command(slash_command)]
 pub async fn uptime(
@@ -18,213 +19,138 @@ pub async fn uptime(
 	#[description = "Username, UUID, or discord ID"] user: Option<String>,
 	#[description = "Time window, eg 7 for 7 days"] window: Option<i64>,
 ) -> Result<(), Error> {
-	let mut start = Instant::now();
+	let start = Instant::now();
 	ctx.defer().await?;
 
 	let user_input = user.unwrap_or_else(|| ctx.author().id.to_string());
 	let (username, uuid) = match get_account_from_anything(&user_input).await {
 		| Ok(result) => result,
 		| Err(_e) => {
-			let embed = CreateEmbed::default()
-				.title("Error")
-				.description("No linked account found")
-				.color(ctx.data().error_color);
+			let embed = create_error_embed("No linked account found");
 			ctx.send(CreateReply::default().embed(embed)).await?;
 			return Ok(());
 		},
 	};
-	println!("get username/uuid: {}", start.elapsed().as_millis());
-	start = Instant::now();
 	let time_window: i64 = window.unwrap_or(7);
 
-	let api_key = &ctx.data().api_key;
-	let pool = &ctx.data().uptime_db_pool;
-	println!("get pool: {}", start.elapsed().as_millis());
-	start = Instant::now();
-
-	let uptime_data = match get_uptime(&uuid, time_window, pool).await {
-		| Ok(data) => {
-			println!(
-				"Fetched uptime successfully: {} ms",
-				start.elapsed().as_millis()
-			);
-			start = Instant::now();
-			data
-		},
-		| Err(_) => {
-			println!(
-				"Failed to fetch uptime, attempting to update uptime: {} ms",
-				start.elapsed().as_millis()
-			);
-			start = Instant::now();
-			match update_uptime(api_key, uuid.clone(), pool).await {
-				| Ok(_) => {
-					println!(
-						"Uptime updated successfully: {} ms",
-						start.elapsed().as_millis()
-					);
-					start = Instant::now();
-					match get_uptime(&uuid, time_window, pool).await {
-						| Ok(data) => {
-							println!(
-								"Fetched uptime after update: {} ms",
-								start.elapsed().as_millis()
-							);
-							start = Instant::now();
-							data
-						},
-						| Err(_) => {
-							println!(
-								"Failed to fetch uptime after update, trying with unknown: {} ms",
-								start.elapsed().as_millis()
-							);
-							start = Instant::now();
-							get_uptime_with_unknown(&uuid, time_window, pool).await?
-						},
-					}
-				},
-				| Err(_) => {
-					println!(
-						"Failed to update uptime, trying with unknown: {} ms",
-						start.elapsed().as_millis()
-					);
-					start = Instant::now();
-					get_uptime_with_unknown(&uuid, time_window, pool).await?
-				},
-			}
+	let client = MONGO_CLIENT.get().expect("MongoDB client is uninitalized").clone();
+	let mut uptime_data = match get_uptime(uuid, time_window, client).await {
+		| Ok(uptime_data) => uptime_data,
+		| Err(e) => {
+			println!("{}", e);
+			let embed = create_error_embed(&e.to_string());
+			ctx.send(CreateReply::default().embed(embed)).await?;
+			return Ok(());
 		},
 	};
 
-	let mut description = String::new();
-	for (date, gexp) in uptime_data {
-		let uptime_str = if gexp >= 0 {
-			gexp_to_uptime_as_string(gexp)
-		} else {
-			"Unknown".to_string()
-		};
-		description.push_str(&format!("{}: {}\n", date, uptime_str));
+	if uptime_data.len() < time_window as usize {
+		uptime_data = fill_missing_dates(uptime_data, time_window);
 	}
-	println!("generate description: {}", start.elapsed().as_millis());
-	start = Instant::now();
+
+	let mut description = String::with_capacity(2_000);
+	for (date, gexp) in uptime_data {
+		let uptime: String;
+		if gexp == -1 {
+			uptime = "Unkown".to_string()
+		} else {
+			uptime = gexp_to_uptime_as_string(gexp)
+		}
+		description.push_str(&format!("{}: {}\n", BsonDateTime_to_string(date), uptime));
+	}
 
 	let color = get_color(&ctx.author().name);
 	let embed = CreateEmbed::default()
 		.title(format!("Uptime for {}", username))
 		.description(description)
 		.color(color);
-	println!("make embed: {}", start.elapsed().as_millis());
-	start = Instant::now();
 
 	ctx.send(CreateReply::default().embed(embed)).await?;
-	log::info!("time taken: {:?}", start.elapsed());
-	println!("reply: {}", start.elapsed().as_millis());
+	println!("time taken: {} ms", start.elapsed().as_millis());
 	Ok(())
 }
 
-#[allow(dead_code)]
-async fn get_uptime_with_unknown(
-	uuid: &str,
-	time_window: i64,
-	pool: &Pool<SqliteConnectionManager>,
-) -> Result<Vec<(String, i64)>, Error> {
-	let conn = pool.get()?;
-	let current_date = Utc::now().date_naive();
-	let mut results = Vec::with_capacity(time_window as usize);
+fn get_uptime(
+    uuid: String,
+    time_window: i64,
+    client: Client,
+) -> Pin<Box<dyn Future<Output = Result<Vec<(String, i64)>, ApiError>> + Send>> {
+    Box::pin(async move {
+        let date: DateTime<Utc> = Utc::now();
+        let start_date: BsonDateTime =
+            BsonDateTime::from_chrono(date - Duration::days(time_window));
+        let filter: Document = doc! {
+            "uuid": uuid.clone(),
+            "date": { "$gte": start_date }
+        };
 
-	let mut stmt = conn.prepare(
-		"SELECT date, gexp FROM uptime
-         WHERE uuid = ? AND date >= date('now', '-' || (? - 1) || ' days')
-         ORDER BY date DESC",
-	)?;
+        let mut cursor: Cursor<Uptime> = client
+            .database("Players")
+            .collection("Uptime")
+            .find(filter.clone())
+            .await?;
+        let mut results: Vec<(String, i64)> = Vec::new();
 
-	let mut date_to_gexp = HashMap::new();
-	for row in stmt.query_map(params![uuid, time_window], |row| {
-		Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?))
-	})? {
-		let (date, gexp) = row?;
-		date_to_gexp.insert(date, gexp);
-	}
+        while let Some(result) = cursor.next().await {
+            let playtime: Uptime = result?;
+            let date_str: String = playtime.date.to_string();
+            results.push((date_str, playtime.gexp));
+        }
 
-	for days_ago in 0..time_window {
-		let date = (current_date - Duration::days(days_ago))
-			.format("%Y-%m-%d")
-			.to_string();
-		results.push((date.clone(), *date_to_gexp.get(&date).unwrap_or(&-1)));
-	}
-
-	Ok(results)
-}
-
-#[allow(dead_code)]
-async fn get_uptime(
-	uuid: &str,
-	time_window: i64,
-	pool: &Pool<SqliteConnectionManager>,
-) -> Result<Vec<(String, i64)>, Error> {
-	let conn = pool.get()?;
-	let mut stmt = conn.prepare(
-		"SELECT date, gexp FROM uptime
-         WHERE uuid = ? AND date >= date('now', '-' || (? - 1) || ' days')
-         ORDER BY date DESC",
-	)?;
-
-	let rows = stmt.query_map(params![uuid, time_window], |row| {
-		Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?))
-	})?;
-
-	let mut results = Vec::new();
-	let mut found_dates = HashSet::new();
-
-	for row in rows {
-		let (date, gexp) = row?;
-		found_dates.insert(date.clone());
-		results.push((date, gexp));
-	}
-
-	if results.len() < time_window as usize {
-		return Err("Missing dates".into());
-	}
-
-	Ok(results)
-}
-
-#[allow(dead_code)]
-async fn update_uptime(
-	api_key: &str,
-	uuid: String,
-	pool: &Pool<SqliteConnectionManager>,
-) -> Result<(), Error> {
-	let mut conn = pool.get()?;
-	let (guild_id, member_uptime_history) = get_guild_uptime_data(api_key, uuid.clone()).await?;
-
-	let tx = conn.transaction()?;
-
-	for (player_uuid, uptime_history) in member_uptime_history {
-		for (date, gexp) in uptime_history {
-			tx.execute(
-				"UPDATE uptime
-                    SET guild_id = ?1, gexp = ?3
-                    WHERE uuid = ?2 AND date = ?4",
-				params![guild_id, player_uuid, gexp, date],
-			)?;
-
-			tx.execute(
-				"INSERT INTO uptime (guild_id, uuid, gexp, date)
-                    SELECT ?1, ?2, ?3, ?4
-                    WHERE NOT EXISTS (
-                        SELECT 1 FROM uptime WHERE uuid = ?2 AND date = ?4
-                    )",
-				params![guild_id, player_uuid, gexp, date],
-			)?;
+        if results.is_empty() {
+			update_uptime(
+				uuid.clone(),
+				API_KEY.get().expect("API_KEY is uninitialized"),
+				client.clone(),
+			).await?;
+			
+			let mut cursor = client
+				.database("Players")
+				.collection("Uptime")
+				.find(filter)
+				.await?;
+			results.clear();
+			while let Some(result) = cursor.next().await {
+				let playtime: Uptime = result?;
+				let date_str = playtime.date.to_string();
+				results.push((date_str, playtime.gexp as i64));
+			}
 		}
-	}
 
-	tx.commit()?;
+        Ok(results)
+    })
+}
 
-	Ok(())
+fn fill_missing_dates(
+    mut results: Vec<(String, i64)>,
+    time_window: i64,
+) -> Vec<(String, i64)> {
+    let now = Utc::now();
+    let start_date = now - Duration::days(time_window);
+
+    let mut date_map: std::collections::HashMap<String, i64> = results.clone()
+        .into_iter()
+        .map(|(date, gexp)| {(BsonDateTime_to_string(date), gexp)})
+        .collect();
+
+    for i in results.len()..time_window as usize {
+        let current_date = start_date + Duration::days(i as i64);
+        let date_str = BsonDateTime::from_chrono(current_date).to_string();
+        let normalized_date = current_date.format("%Y-%m-%d").to_string();
+
+        let gexp = date_map.remove(&normalized_date).unwrap_or(-1);
+        results.push((date_str, gexp));
+    }
+
+    results
 }
 
 #[allow(dead_code)]
-pub fn gexp_to_uptime_as_string(gexp: i64) -> String {
+fn gexp_to_uptime_as_string(gexp: i64) -> String {
 	format!("{}h {}m", gexp / 9000, (gexp % 9000) / 150)
+}
+
+#[allow(non_snake_case, dead_code)]
+fn BsonDateTime_to_string(date: String) -> String {
+	format!("**{}**", date.get(..10).unwrap_or("Unknown Date"))
 }

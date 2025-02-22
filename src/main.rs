@@ -1,15 +1,18 @@
 mod commands;
 mod data;
+mod tasks;
 
 use std::env::var;
 use std::sync::Arc;
 use std::time::Duration;
 
-use data::database::{create_uptime_table, create_users_table};
+use data::database::create_users_table;
 use dotenv::dotenv;
+use mongodb::Client;
+use mongodb::options::ClientOptions;
 use poise::serenity_prelude as serenity;
-use r2d2::Pool;
-use r2d2_sqlite::SqliteConnectionManager;
+use tasks::update_uptime::uptime_updater;
+use tokio::sync::OnceCell;
 use types::{Context, Error};
 
 mod types {
@@ -17,15 +20,41 @@ mod types {
 	pub type Context<'a> = poise::Context<'a, super::Data, Error>;
 }
 
-pub struct Data {
-	api_key:        String,
-	uptime_db_pool: Pool<SqliteConnectionManager>,
-	error_color:    u32,
+pub struct Data {}
+
+static MONGO_CLIENT: OnceCell<Client> = OnceCell::const_new();
+static API_KEY: OnceCell<String> = OnceCell::const_new();
+static ERROR_COLOR: OnceCell<u32> = OnceCell::const_new();
+
+async fn init_global_data() {
+	API_KEY
+		.set(
+			var("API_KEY")
+				.expect_error("Missing `API_KEY` env var, please include this in your .env file"),
+		)
+		.expect_error("API_KEY can only be initialized once");
+
+	let mongo_url = var("MONGO_URL")
+		.expect_error("Missing `API_KEY` env var, please include this in your .env file");
+	let options = ClientOptions::parse(mongo_url)
+		.await
+		.expect_error("Could not create mongo client options");
+	let client = Client::with_options(options).expect_error("Could not create mongo client");
+
+	MONGO_CLIENT
+		.set(client)
+		.expect_error("MONGO_CLIENT can only be initialized once");
+
+	ERROR_COLOR
+		.set(0x770505)
+		.expect_error("ERROR_COLOR can only be initialized once")
 }
 
 async fn on_error(error: poise::FrameworkError<'_, Data, Error>) {
 	match error {
-		| poise::FrameworkError::Setup { error, .. } => panic!("Failed to start bot: {:?}", error),
+		| poise::FrameworkError::Setup { error, .. } => {
+			panic!("\x1b[31;1m[ERROR] Failed to start bot:\x1b[0m {:?}", error)
+		},
 		| poise::FrameworkError::Command { error, ctx, .. } => {
 			println!(
 				"\x1b[31;1m[ERROR] in command '{}':\x1b[0m {:?}",
@@ -62,9 +91,6 @@ async fn main() {
 	dotenv().ok();
 	env_logger::init();
 
-	let api_key = var("API_KEY")
-		.expect_error("Missing `API_KEY` env var, please include this in your .env file");
-
 	let options = poise::FrameworkOptions {
 		commands: commands::get_all_commands(),
 		prefix_options: poise::PrefixFrameworkOptions {
@@ -95,34 +121,29 @@ async fn main() {
 		..Default::default()
 	};
 
-	create_users_table().expect_error("Failed to create database 'users'\n\n");
-	create_uptime_table().expect_error("Failed to create database 'uptime'\n\n");
+	init_global_data().await;
+	create_users_table().expect_error("Failed to create database \'users\'");
 
-	// create uptime db connection pool
-	let manager = SqliteConnectionManager::file("src/data/uptime.db")
-		.with_flags(rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE);
-	let uptime_db_pool = Pool::new(manager).expect("Failed to create database pool");
-
-	let clone_api_key = api_key.clone();
 	let framework = poise::Framework::builder()
 		.setup(move |ctx, _ready, framework| {
 			Box::pin(async move {
 				println!("Logged in as {}", _ready.user.name);
 				poise::builtins::register_globally(ctx, &framework.options().commands).await?;
-				Ok(Data {
-					api_key: clone_api_key,
-					uptime_db_pool,
-					error_color: 0x383838,
-				})
+				Ok(Data {})
 			})
 		})
 		.options(options)
 		.build();
 
 	tokio::task::spawn_blocking(move || {
-		if let Err(err) =
-			tokio::runtime::Handle::current().block_on(data::update_uptime::update_uptime(&api_key))
-		{
+		if let Err(err) = tokio::runtime::Handle::current().block_on(uptime_updater(
+			&API_KEY.get().unwrap(),
+			MONGO_CLIENT
+				.get()
+				.unwrap()
+				.database("Players")
+				.collection("Uptime"),
+		)) {
 			eprintln!(
 				"\x1b[31;1m[ERROR] Error in uptime tracker:\x1b[0m\n\n{:?}",
 				err
@@ -130,7 +151,7 @@ async fn main() {
 		}
 	});
 
-	let token = var("BOT_TOKEN").expect(
+	let token = var("BOT_TOKEN").expect_error(
 		"\x1b[31;1m[ERROR] Missing `BOT_TOKEN` env var, please include this in your .env file",
 	);
 	let intents =

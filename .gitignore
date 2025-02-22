@@ -1,4 +1,4 @@
 /target
 .env
 *.db
-/.idea
+clippy.json

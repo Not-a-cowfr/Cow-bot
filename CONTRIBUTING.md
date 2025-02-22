@@ -1,8 +1,21 @@
+### Prerequisites
+- Git
+- Rust
+- [msvc build tools](https://visualstudio.microsoft.com/downloads/?q=build+tools)
+    - You can also use this [gist](https://gist.github.com/mmozeiko/7f3162ec2988e81e56d5c4e22cde9977) if you just need
+      the build tools for rust
+- sqlite3
+- MongoDB server
+- A Discord bot
+- Hypixel api key
+
 ### Setting Up
 - Fill out required environment variables
     - Create a copy of [.env.example](.env.example) and rename it to `.env`
     - Get your hypixel api key from the [developer dashboard](https://developer.hypixel.net/)
     - Create a [discord bot](https://discord.com/developers/docs/resources/application) and copy its private token
+    - Setup a MongoDb server however you like and copy the url
+- Run `cargo run --profile dev` or use [Code Runner](https://marketplace.visualstudio.com/items?itemName=formulahendry.code-runner) VSCode extension and click run
 
 ### How to add a command
 - Add a file ending with `_command` in `src/commands/`
