@@ -34,7 +34,7 @@ pub async fn uptime(
 	let time_window: i64 = window.unwrap_or(7);
 
 	let client = MONGO_CLIENT.get().expect("MongoDB client is uninitalized").clone();
-	let uptime_data = match get_uptime(uuid, time_window, client).await {
+	let mut uptime_data = match get_uptime(uuid, time_window, client).await {
 		| Ok(uptime_data) => uptime_data,
 		| Err(e) => {
 			println!("{}", e);
@@ -44,14 +44,19 @@ pub async fn uptime(
 		},
 	};
 
+	if uptime_data.len() < time_window as usize {
+		uptime_data = fill_missing_dates(uptime_data, time_window);
+	}
+
 	let mut description = String::with_capacity(2_000);
 	for (date, gexp) in uptime_data {
-		let uptime_str = if gexp >= 0 {
-			gexp_to_uptime_as_string(gexp)
+		let uptime: String;
+		if gexp == -1 {
+			uptime = "Unkown".to_string()
 		} else {
-			"Unknown".to_string()
-		};
-		description.push_str(&format!("{}: {}\n", BsonDateTime_to_string(date), uptime_str));
+			uptime = gexp_to_uptime_as_string(gexp)
+		}
+		description.push_str(&format!("{}: {}\n", BsonDateTime_to_string(date), uptime));
 	}
 
 	let color = get_color(&ctx.author().name);
@@ -89,7 +94,7 @@ fn get_uptime(
         while let Some(result) = cursor.next().await {
             let playtime: Uptime = result?;
             let date_str: String = playtime.date.to_string();
-            results.push((date_str, playtime.gexp as i64));
+            results.push((date_str, playtime.gexp));
         }
 
         if results.is_empty() {
@@ -116,11 +121,36 @@ fn get_uptime(
     })
 }
 
+fn fill_missing_dates(
+    mut results: Vec<(String, i64)>,
+    time_window: i64,
+) -> Vec<(String, i64)> {
+    let now = Utc::now();
+    let start_date = now - Duration::days(time_window);
+
+    let mut date_map: std::collections::HashMap<String, i64> = results.clone()
+        .into_iter()
+        .map(|(date, gexp)| {(BsonDateTime_to_string(date), gexp)})
+        .collect();
+
+    for i in results.len()..time_window as usize {
+        let current_date = start_date + Duration::days(i as i64);
+        let date_str = BsonDateTime::from_chrono(current_date).to_string();
+        let normalized_date = current_date.format("%Y-%m-%d").to_string();
+
+        let gexp = date_map.remove(&normalized_date).unwrap_or(-1);
+        results.push((date_str, gexp));
+    }
+
+    results
+}
+
+#[allow(dead_code)]
 fn gexp_to_uptime_as_string(gexp: i64) -> String {
 	format!("{}h {}m", gexp / 9000, (gexp % 9000) / 150)
 }
 
-#[allow(non_snake_case)]
+#[allow(non_snake_case, dead_code)]
 fn BsonDateTime_to_string(date: String) -> String {
-	format!("**{}**", date.replace(" 0:00:00.0 +00:00:00", ""))
+	format!("**{}**", date.get(..10).unwrap_or("Unknown Date"))
 }
