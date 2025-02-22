@@ -1,16 +1,17 @@
+use std::pin::Pin;
 use std::time::Instant;
 
 use chrono::{DateTime, Duration, Utc};
 use futures::stream::StreamExt;
 use mongodb::bson::{Document, doc};
 use bson::DateTime as BsonDateTime;
-use mongodb::{Collection, Cursor};
+use mongodb::{Client, Cursor};
 use poise::CreateReply;
 use serenity::builder::CreateEmbed;
 
 use crate::commands::utils::{get_account_from_anything, get_color};
-use crate::tasks::update_uptime::Uptime;
-use crate::{Context, Error, MONGO_CLIENT};
+use crate::tasks::update_uptime::{ApiError, Uptime, update_uptime};
+use crate::{Context, Error, API_KEY, MONGO_CLIENT};
 
 #[poise::command(slash_command)]
 pub async fn uptime(
@@ -35,8 +36,8 @@ pub async fn uptime(
 	};
 	let time_window: i64 = window.unwrap_or(7);
 
-	let collection = MONGO_CLIENT.get().expect("MongoDB client is uninitalized").clone().database("Players").collection("Uptime");
-	let uptime_data = match get_uptime(uuid, time_window, collection).await {
+	let client = MONGO_CLIENT.get().expect("MongoDB client is uninitalized").clone();
+	let uptime_data = match get_uptime(uuid, time_window, client).await {
 		| Ok(uptime_data) => uptime_data,
 		| Err(e) => {
 			println!("{}", e);
@@ -70,28 +71,51 @@ pub async fn uptime(
 	Ok(())
 }
 
-async fn get_uptime(
-	uuid: String,
-	time_window: i64,
-	collection: Collection<Uptime>,
-) -> Result<Vec<(String, i64)>, mongodb::error::Error> {
-	let date: DateTime<Utc> = Utc::now();
-	let start_date: BsonDateTime = BsonDateTime::from_chrono(date - Duration::days(time_window));
-	let filter: Document = doc! {
-		"uuid": uuid,
-		"date": { "$gte": start_date }
-	};
-	
-	let mut cursor: Cursor<Uptime> = collection.find(filter).await?;
-	let mut results: Vec<(String, i64)> = Vec::new();
+fn get_uptime(
+    uuid: String,
+    time_window: i64,
+    client: Client,
+) -> Pin<Box<dyn Future<Output = Result<Vec<(String, i64)>, ApiError>> + Send>> {
+    Box::pin(async move {
+        let date: DateTime<Utc> = Utc::now();
+        let start_date: BsonDateTime =
+            BsonDateTime::from_chrono(date - Duration::days(time_window));
+        let filter: Document = doc! {
+            "uuid": uuid.clone(),
+            "date": { "$gte": start_date }
+        };
 
-	while let Some(result) = cursor.next().await {
-		let playtime: Uptime = result?;
-		let date_str: String = playtime.date.to_string();
-		results.push((date_str, playtime.gexp as i64));
-	}
+        let mut cursor: Cursor<Uptime> = client
+            .database("Players")
+            .collection("Uptime")
+            .find(filter)
+            .await?;
+        let mut results: Vec<(String, i64)> = Vec::new();
 
-	Ok(results)
+        while let Some(result) = cursor.next().await {
+            let playtime: Uptime = result?;
+            let date_str: String = playtime.date.to_string();
+            results.push((date_str, playtime.gexp as i64));
+        }
+
+        if results.is_empty() {
+            match update_uptime(
+                uuid.clone(),
+                API_KEY.get().expect("API_KEY is uninitialized"),
+                client.clone(),
+            )
+            .await
+            {
+                Ok(()) => {
+                    // Recursively call get_uptime and await its result.
+                    results = get_uptime(uuid, time_window, client).await?;
+                }
+                Err(e) => return Err(e),
+            }
+        }
+
+        Ok(results)
+    })
 }
 
 #[allow(dead_code)]

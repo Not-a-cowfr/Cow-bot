@@ -46,7 +46,7 @@ pub async fn uptime_updater(
 			}
 
 			match update_uptime(player.clone(), api_key, client.clone()).await {
-				| Err(ApiError::NoGuild(_)) => no_guild += 1,
+				| Err(ApiError::NoGuild()) => no_guild += 1,
 				| _ => {},
 			};
 
@@ -67,7 +67,7 @@ pub async fn uptime_updater(
 pub enum ApiError {
 	Database(mongodb::error::Error),
 	Api(String),
-	NoGuild(String),
+	NoGuild(),
 }
 
 impl std::error::Error for ApiError {}
@@ -80,7 +80,7 @@ impl fmt::Display for ApiError {
 		match self {
 			| ApiError::Database(e) => write!(f, "Database error: {}", e),
 			| ApiError::Api(msg) => write!(f, "API error: {}", msg),
-			| ApiError::NoGuild(uuid) => write!(f, "Player {} is not in a guild", uuid),
+			| ApiError::NoGuild() => write!(f, "Player is not in a guild"),
 		}
 	}
 }
@@ -126,7 +126,7 @@ async fn get_guild_uptime_data(
 
 	let guild = guild_response
 		.guild
-		.ok_or_else(|| ApiError::NoGuild(uuid.clone()))?;
+		.ok_or_else(|| ApiError::NoGuild())?;
 
 	let mut guild_uptime_data = HashMap::new();
 
@@ -153,7 +153,7 @@ pub async fn update_uptime(
 	let (guild_id, member_uptime_history) = match get_guild_uptime_data(api_key, uuid.clone()).await
 	{
 		| Ok(result) => result,
-		| Err(_) => return Err(ApiError::NoGuild(uuid)),
+		| Err(_) => return Err(ApiError::NoGuild()),
 	};
 
 	let mut models = Vec::new();
