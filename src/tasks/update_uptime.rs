@@ -5,8 +5,8 @@ use std::time::Duration;
 use bson::oid::ObjectId;
 use bson::{DateTime as BsonDateTime, Document, doc};
 use chrono::{NaiveDateTime, TimeZone, Utc};
-use mongodb::options::ReplaceOneModel;
-use mongodb::{Client, Collection};
+use mongodb::options::{IndexOptions, ReplaceOneModel};
+use mongodb::{Client, Collection, IndexModel};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -158,6 +158,11 @@ pub async fn update_uptime(
 
 	let mut models = Vec::new();
 	let collection: Collection<Uptime> = client.database("Players").collection("Uptime");
+	let index_model = IndexModel::builder()
+		.keys(doc! { "uuid": 1, "date": 1 })
+		.options(IndexOptions::builder().unique(true).build())
+		.build();
+	collection.create_index(index_model).await?;
 
 	for (uuid, uptime_history) in member_uptime_history {
 		for (unformatted_date, new_gexp) in uptime_history {
