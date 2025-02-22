@@ -25,11 +25,13 @@ pub async fn get_linked_account(
 	let color = get_color(&ctx.author().name);
 
 	let embed = CreateEmbed::default()
-        .title(format!("Player information for **{username}**"))
-        .description(format!(
-            "Username: **{username}**\nUUID: `{uuid}`\n\n<https://elitebot.dev/@{username}>\n\n<https://cupcake.shiiyu.moe/stats/{username}>"
-        ))
-        .color(color);
+    .title(format!("Player information for **{username}**"))
+    .description(format!(
+        "Username: **{username}**\nUUID: `{uuid}`\n\n<https://elitebot.dev/@{username}>\n\n<https://cupcake.shiiyu.moe/stats/{username}>"
+    ))
+    .color(color)
+    .thumbnail(format!("https://mc-heads.net/body/{}/left", uuid));
+
 
 	ctx.send(CreateReply::default().embed(embed)).await?;
 	Ok(())

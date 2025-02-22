@@ -124,9 +124,7 @@ async fn get_guild_uptime_data(
 	let response_text = response.text().await?;
 	let guild_response: GuildResponse = serde_json::from_str(&response_text)?;
 
-	let guild = guild_response
-		.guild
-		.ok_or_else(|| ApiError::NoGuild())?;
+	let guild = guild_response.guild.ok_or_else(|| ApiError::NoGuild())?;
 
 	let mut guild_uptime_data = HashMap::new();
 
