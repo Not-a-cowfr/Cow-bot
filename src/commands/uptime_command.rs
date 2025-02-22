@@ -88,7 +88,7 @@ fn get_uptime(
         let mut cursor: Cursor<Uptime> = client
             .database("Players")
             .collection("Uptime")
-            .find(filter)
+            .find(filter.clone())
             .await?;
         let mut results: Vec<(String, i64)> = Vec::new();
 
@@ -99,19 +99,24 @@ fn get_uptime(
         }
 
         if results.is_empty() {
-            match update_uptime(
-                uuid.clone(),
-                API_KEY.get().expect("API_KEY is uninitialized"),
-                client.clone(),
-            )
-            .await
-            {
-                Ok(()) => {
-                    results = get_uptime(uuid, time_window, client).await?;
-                }
-                Err(e) => return Err(e),
-            }
-        }
+			update_uptime(
+				uuid.clone(),
+				API_KEY.get().expect("API_KEY is uninitialized"),
+				client.clone(),
+			).await?;
+			
+			let mut cursor = client
+				.database("Players")
+				.collection("Uptime")
+				.find(filter)
+				.await?;
+			results.clear();
+			while let Some(result) = cursor.next().await {
+				let playtime: Uptime = result?;
+				let date_str = playtime.date.to_string();
+				results.push((date_str, playtime.gexp as i64));
+			}
+		}
 
         Ok(results)
     })
