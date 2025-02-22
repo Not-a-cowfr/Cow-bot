@@ -1,11 +1,13 @@
 mod commands;
 mod data;
+mod tasks;
 
 use std::env::var;
 use std::sync::Arc;
 use std::time::Duration;
 
 use data::database::create_users_table;
+use tasks::update_uptime::uptime_updater;
 use dotenv::dotenv;
 use mongodb::Client;
 use mongodb::options::ClientOptions;
@@ -132,16 +134,16 @@ async fn main() {
 		.options(options)
 		.build();
 
-	/*tokio::task::spawn_blocking(move || {
+	tokio::task::spawn_blocking(move || {
 		if let Err(err) =
-			tokio::runtime::Handle::current().block_on(data::update_uptime::update_uptime(&api_key))
+			tokio::runtime::Handle::current().block_on(uptime_updater(&API_KEY.get().unwrap(), MONGO_CLIENT.get().unwrap().database("Players").collection("Uptime")))
 		{
 			eprintln!(
 				"\x1b[31;1m[ERROR] Error in uptime tracker:\x1b[0m\n\n{:?}",
 				err
 			);
 		}
-	});*/
+	});
 
 	let token = var("BOT_TOKEN").expect_error(
 		"\x1b[31;1m[ERROR] Missing `BOT_TOKEN` env var, please include this in your .env file",

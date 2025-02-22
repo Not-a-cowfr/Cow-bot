@@ -1,25 +1,49 @@
-use std::time::Duration;
+use std::{collections::HashMap, fmt, time::Duration};
 
-use mongodb::Collection;
+use bson::{doc, oid::ObjectId, DateTime as BsonDateTime, Document};
+use chrono::{NaiveDateTime, TimeZone, Utc};
+use mongodb::{options::ReplaceOneModel, Client, Collection};
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
+
+use crate::MONGO_CLIENT;
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Uptime {
+	#[serde(rename = "_id", skip_serializing_if = "Option::is_none")]
+	pub id:       Option<ObjectId>,
+	pub uuid:     String,
+	pub gexp:     i64,
+	pub date:     BsonDateTime,
+	pub guild_id: String,
+}
 
 pub async fn uptime_updater(api_key: &str, collection: Collection<Uptime>) -> Result<(), ApiError> {
 	loop {
+		let client = MONGO_CLIENT.get().unwrap();
+
 		let players: Vec<String> = collection
-			.distinct("uuid", None, None)
+			.distinct("uuid",  Document::new())
 			.await?
 			.into_iter()
 			.filter_map(|bson_value| bson_value.as_str().map(String::from))
 			.collect();
 
 		println!("Updating Uptime for {} players", players.len());
+		let mut processed_uuids: Vec<String> = Vec::new();
 
 		let mut no_guild: u16 = 0;
 		for player in players {
-			if processed_uuids.contains(&player) {
+			if processed_uuids.contains(&player.clone()) {
 				continue;
 			}
 
-			update_uptime(player, api_key, collection);
+			match update_uptime(player.clone(), api_key, client.clone()).await {
+				Err(ApiError::NoGuild(_)) => no_guild += 1,
+				_ => {},
+			};
+
+			processed_uuids.push(player);
 		}
 		if no_guild > 0 {
 			println!(
@@ -85,20 +109,15 @@ async fn get_guild_uptime_data(
 	uuid: String,
 ) -> Result<(String, HashMap<String, HashMap<String, i64>>), Box<dyn std::error::Error + Send + Sync>>
 {
-	let mut start = Instant::now();
 	let url = format!("https://api.hypixel.net/v2/guild?key={api_key}&player={uuid}");
 
 	let response = reqwest::get(&url).await?;
-	println!("get guild data: {} ms", start.elapsed().as_millis());
-	start = Instant::now();
 	let response_text = response.text().await?;
 	let guild_response: GuildResponse = serde_json::from_str(&response_text)?;
 
 	let guild = guild_response
 		.guild
 		.ok_or_else(|| ApiError::NoGuild(uuid.clone()))?;
-	println!("parse data: {} ms", start.elapsed().as_millis());
-	start = Instant::now();
 
 	let mut guild_uptime_data = HashMap::new();
 
@@ -113,7 +132,6 @@ async fn get_guild_uptime_data(
 		}
 		guild_uptime_data.insert(member.uuid, uptime_history);
 	}
-	println!("return data: {} ms", start.elapsed().as_millis());
 
 	Ok((guild._id, guild_uptime_data))
 }
@@ -122,9 +140,11 @@ pub async fn update_uptime(
     uuid: String,
     api_key: &str,
     client: Client,
-) -> Result<(), mongodb::error::Error> {
-    let (guild_id, member_uptime_history) =
-        get_guild_uptime_data(api_key, uuid.clone()).await.unwrap();
+) -> Result<(), ApiError> {
+    let (guild_id, member_uptime_history) = match get_guild_uptime_data(api_key, uuid.clone()).await {
+		Ok(result) => result,
+		Err(_) => return Err(ApiError::NoGuild(uuid)),
+	};
 
     let mut models = Vec::new();
 	let collection: Collection<Uptime> = client.database("Players").collection("Uptime");

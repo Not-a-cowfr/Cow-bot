@@ -1,5 +1,3 @@
-use std::time::Instant;
-
 use rusqlite::{Connection, Result, params};
 use serde::Deserialize;
 

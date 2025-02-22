@@ -2,16 +2,14 @@ use std::time::Instant;
 
 use chrono::{DateTime, Duration, Utc};
 use futures::stream::StreamExt;
-use mongodb::bson::oid::ObjectId;
 use mongodb::bson::{Document, doc};
 use bson::DateTime as BsonDateTime;
 use mongodb::{Collection, Cursor};
 use poise::CreateReply;
-use serde::{Deserialize, Serialize};
 use serenity::builder::CreateEmbed;
 
-
 use crate::commands::utils::{get_account_from_anything, get_color};
+use crate::tasks::update_uptime::Uptime;
 use crate::{Context, Error, MONGO_CLIENT};
 
 #[poise::command(slash_command)]
@@ -20,10 +18,10 @@ pub async fn uptime(
 	#[description = "Username, UUID, or discord ID"] user: Option<String>,
 	#[description = "Time window, eg 7 for 7 days"] window: Option<i64>,
 ) -> Result<(), Error> {
-	let mut start = Instant::now();
 	ctx.defer().await?;
 
 	let user_input = user.unwrap_or_else(|| ctx.author().id.to_string());
+	let mut start = Instant::now();
 	let (username, uuid) = match get_account_from_anything(&user_input).await {
 		| Ok(result) => result,
 		| Err(_e) => {
@@ -85,16 +83,6 @@ pub async fn uptime(
 	log::info!("time taken: {:?}", start.elapsed());
 	println!("reply: {} ms", start.elapsed().as_millis());
 	Ok(())
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Uptime {
-	#[serde(rename = "_id", skip_serializing_if = "Option::is_none")]
-	id:       Option<ObjectId>,
-	uuid:     String,
-	gexp:     i64,
-	date:     BsonDateTime,
-	guild_id: String,
 }
 
 async fn get_uptime(
