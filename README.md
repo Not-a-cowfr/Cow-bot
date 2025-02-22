@@ -15,7 +15,7 @@ Features
 <h2 align="center">
 Contribute
 </h2>
-Check out the [Contributing guide](./CONTRIBUTING.md) for more info on how get things setup
+Check out the [Contributing guide](/CONTRIBUTING.md) for more info on how get things setup
 
 <h2 align="center">
 Credits
