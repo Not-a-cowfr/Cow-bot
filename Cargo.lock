@@ -381,6 +381,7 @@ dependencies = [
  "lazy_static",
  "log",
  "mongodb",
+ "once_cell",
  "poise",
  "r2d2",
  "r2d2_sqlite",

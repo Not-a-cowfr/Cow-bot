@@ -33,10 +33,14 @@ fn main() {
 						continue;
 					}
 
-					module_entries.insert(format!("pub mod {};", filename));
+					if filename.ends_with("_command") {
+						module_entries.insert(format!("mod {};", filename));
 						if let Some(command_name) = filename.strip_suffix("_command") {
 							function_entries.push(format!("{}::{}()", filename, command_name));
 						}
+					} else {
+						module_entries.insert(format!("pub mod {};", filename));
+					}
 				}
 			}
 		}

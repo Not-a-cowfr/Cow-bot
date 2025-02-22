@@ -5,10 +5,12 @@ use std::env::var;
 use std::sync::Arc;
 use std::time::Duration;
 
+use data::database::create_users_table;
 use dotenv::dotenv;
 use mongodb::Client;
 use mongodb::options::ClientOptions;
 use poise::serenity_prelude as serenity;
+use tokio::sync::OnceCell;
 use types::{Context, Error};
 
 mod types {
@@ -17,9 +19,30 @@ mod types {
 }
 
 pub struct Data {
-	api_key:      String,
-	mongo_client: Client,
-	error_color:  u32,
+	error_color: u32,
+}
+
+static MONGO_CLIENT: OnceCell<Client> = OnceCell::const_new();
+static API_KEY: OnceCell<String> = OnceCell::const_new();
+
+async fn init_global_data() {
+	API_KEY
+		.set(
+			var("API_KEY")
+				.expect_error("Missing `API_KEY` env var, please include this in your .env file"),
+		)
+		.expect_error("API_KEY can only be initialized once");
+
+	let mongo_url = var("MONGO_URL")
+		.expect_error("Missing `API_KEY` env var, please include this in your .env file");
+	let options = ClientOptions::parse(mongo_url)
+		.await
+		.expect_error("Could not create mongo client options");
+	let client = Client::with_options(options).expect_error("Could not create mongo client");
+
+	MONGO_CLIENT
+		.set(client)
+		.expect_error("MongoDB client can only be initialized once");
 }
 
 async fn on_error(error: poise::FrameworkError<'_, Data, Error>) {
@@ -63,9 +86,6 @@ async fn main() {
 	dotenv().ok();
 	env_logger::init();
 
-	let api_key = var("API_KEY")
-		.expect_error("Missing `API_KEY` env var, please include this in your .env file");
-
 	let options = poise::FrameworkOptions {
 		commands: commands::get_all_commands(),
 		prefix_options: poise::PrefixFrameworkOptions {
@@ -96,25 +116,16 @@ async fn main() {
 		..Default::default()
 	};
 
-	let mongo_options = ClientOptions::parse(
-		var("MONGO_URL").expect_error("MONGO_URL environment variable is missing!"),
-	)
-	.await
-	.expect_error("Could not create mongo client options!");
-	let client = Client::with_options(mongo_options).expect_error("Could not create mongo client!");
+	init_global_data().await;
+	create_users_table().expect_error("Failed to create database \'users\'");
 
-	data::database::create_users_table().expect_error("Failed to create database \'users\'");
-
-	let clone_api_key = api_key.clone();
 	let framework = poise::Framework::builder()
 		.setup(move |ctx, _ready, framework| {
 			Box::pin(async move {
 				println!("Logged in as {}", _ready.user.name);
 				poise::builtins::register_globally(ctx, &framework.options().commands).await?;
 				Ok(Data {
-					api_key:      clone_api_key,
-					mongo_client: client,
-					error_color:  0x770505,
+					error_color: 0x770505,
 				})
 			})
 		})
@@ -132,7 +143,7 @@ async fn main() {
 		}
 	});*/
 
-	let token = var("BOT_TOKEN").expect(
+	let token = var("BOT_TOKEN").expect_error(
 		"\x1b[31;1m[ERROR] Missing `BOT_TOKEN` env var, please include this in your .env file",
 	);
 	let intents =
