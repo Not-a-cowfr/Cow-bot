@@ -1,3 +1,5 @@
+use std::time::Instant;
+
 use rusqlite::{Connection, Result, params};
 use serde::Deserialize;
 
@@ -26,86 +28,82 @@ pub fn get_color(username: &str) -> u32 {
 		.unwrap_or(0x383838) // default color if there's an error or no color found
 }
 
-pub async fn get_account_from_anything(identifier: &str) -> Result<(String, String), Error> {
-	let (uuid, username);
-	if identifier.len() == 32 || identifier.len() <= 16 {
-		// mojang uuid or username
-		let result = get_mojang_info(identifier.to_string()).await?;
-		username = result.0;
-		uuid = result.1;
-	} else if identifier
-		.replace(&['@', '<', '>'][..], "")
-		.trim()
-		.parse::<u64>()
-		.is_ok()
-	{
-		// discord id
-		let result =
-			get_linked_elite_account(identifier.replace(&['@', '<', '>'][..], "").to_string())
-				.await?;
-		username = result.0;
-		uuid = result.1;
-	} else {
-		return Err(Box::new(std::io::Error::new(
-			std::io::ErrorKind::InvalidInput,
-			"Invalid player name or UUID",
-		)));
-	}
-	Ok((username, uuid))
-}
-
 #[derive(Deserialize)]
 struct MojangResponse {
-	id:   String,
-	name: String,
+    id: String,
+    name: String,
 }
 
-// returns (username, uuid)
+pub async fn get_account_from_anything(identifier: &str) -> Result<(String, String), Error> {
+    let clean_identifier = identifier.replace(&['@', '<', '>'][..], "").trim().to_string();
+
+    let result = if identifier.len() == 32 || identifier.len() <= 16 {
+        get_mojang_info(identifier.to_string()).await?
+    } else if clean_identifier.parse::<u64>().is_ok() {
+        get_linked_elite_account(clean_identifier).await?
+    } else {
+        return Err(Box::new(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "Invalid player name or UUID",
+        )));
+    };
+
+    Ok(result)
+}
+
 pub async fn get_mojang_info(player: String) -> Result<(String, String), Error> {
-	let url = if player.len() == 32 {
-		format!("https://api.mojang.com/user/profile/{}", player)
-	} else if player.len() <= 16 {
-		format!("https://api.mojang.com/users/profiles/minecraft/{}", player)
-	} else {
-		return Err(Box::new(std::io::Error::new(
-			std::io::ErrorKind::InvalidInput,
-			"Invalid player name or UUID",
-		)));
-	};
+    let url = if player.len() == 32 {
+        format!("https://api.mojang.com/user/profile/{}", player)
+    } else if player.len() <= 16 {
+        format!("https://api.mojang.com/users/profiles/minecraft/{}", player)
+    } else {
+        return Err(Box::new(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "Invalid player name or UUID",
+        )));
+    };
 
-	let response = reqwest::get(&url).await?;
-	let response_text = response.text().await?;
+    let response = reqwest::get(&url).await?;
 
-	if response_text.contains("errorMessage") {
-		if response_text.contains("CONSTRAINT_VIOLATION") {
-			return Err(Box::new(std::io::Error::new(
-				std::io::ErrorKind::InvalidInput,
-				"Invalid UUID string",
-			)));
-		} else {
-			return Err(Box::new(std::io::Error::new(
-				std::io::ErrorKind::NotFound,
-				format!("Player \"{}\" does not exist", player),
-			)));
-		}
-	}
+    if !response.status().is_success() {
+        let error_text = response.text().await?;
+        if error_text.contains("CONSTRAINT_VIOLATION") {
+            return Err(Box::new(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "Invalid UUID string",
+            )));
+        } else {
+            return Err(Box::new(std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                format!("Player \"{}\" does not exist", player),
+            )));
+        }
+    }
 
-	let mojang_info: MojangResponse = serde_json::from_str(&response_text)?;
-	Ok((mojang_info.name, mojang_info.id))
+    let mojang_info: MojangResponse = response.json().await?;
+    Ok((mojang_info.name, mojang_info.id))
 }
 
-pub async fn get_linked_elite_account(discordid: String) -> Result<(String, String), Error> {
-	let url = format!("https://api.elitebot.dev/account/{discordid}");
-	let response = reqwest::get(&url).await?;
-	let response_text = response.text().await?;
+pub async fn get_linked_elite_account(discord_id: String) -> Result<(String, String), Error> {
+    let url = format!("https://api.elitebot.dev/account/{}", discord_id);
+    let response = reqwest::get(&url).await?;
+    let status = response.status();
+    let body = response.text().await?;
 
-	if response_text == "Minecraft account not found." {
-		return Err(Box::new(std::io::Error::new(
-			std::io::ErrorKind::NotFound,
-			"No linked account found!",
-		)));
-	}
+    if !status.is_success() {
+        if body.trim() == "Minecraft account not found." {
+            return Err(Box::new(std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                "No linked account found!",
+            )));
+        } else {
+            return Err(Box::new(std::io::Error::new(
+                std::io::ErrorKind::Other,
+                format!("Error: {}", body),
+            )));
+        }
+    }
 
-	let mojang_info: MojangResponse = serde_json::from_str(&response_text)?;
-	Ok((mojang_info.name, mojang_info.id))
+    let account: MojangResponse = serde_json::from_str(&body)?;
+    Ok((account.name, account.id))
 }
