@@ -107,7 +107,6 @@ fn get_uptime(
             .await
             {
                 Ok(()) => {
-                    // Recursively call get_uptime and await its result.
                     results = get_uptime(uuid, time_window, client).await?;
                 }
                 Err(e) => return Err(e),
