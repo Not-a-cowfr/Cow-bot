@@ -57,7 +57,7 @@ pub async fn uptime(
 		} else {
 			"Unknown".to_string()
 		};
-		description.push_str(&format!("{}: {}\n", date, uptime_str));
+		description.push_str(&format!("{}: {}\n", BsonDateTime_to_string(date), uptime_str));
 	}
 
 	let color = get_color(&ctx.author().name);
@@ -118,7 +118,11 @@ fn get_uptime(
     })
 }
 
-#[allow(dead_code)]
 fn gexp_to_uptime_as_string(gexp: i64) -> String {
 	format!("{}h {}m", gexp / 9000, (gexp % 9000) / 150)
+}
+
+#[allow(non_snake_case)]
+fn BsonDateTime_to_string(date: String) -> String {
+	format!("**{}**", date.replace(" 0:00:00.0 +00:00:00", ""))
 }
