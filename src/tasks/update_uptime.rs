@@ -153,7 +153,7 @@ pub async fn update_uptime(
 	let (guild_id, member_uptime_history) = match get_guild_uptime_data(api_key, uuid.clone()).await
 	{
 		| Ok(result) => result,
-		| Err(_) => return Err(ApiError::NoGuild()),
+		| Err(e) => return Err(e.into()),
 	};
 
 	let mut models = Vec::new();
