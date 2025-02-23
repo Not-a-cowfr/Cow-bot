@@ -170,9 +170,19 @@ async fn raw(
     let (data, id) = get_data_and_id(ctx).await?;
 
     if let Ok(Some((_name, content))) = data.tag_db.get_tag(&name, id).await {
-        ctx.send(CreateReply::default().content(content.replace("`", "\\`"))).await?;
+        let escaped_content = content
+            .replace("`", "\\`")
+            .replace("*", "\\*")
+            .replace("_", "\\_")
+            .replace("~", "\\~")
+            .replace("#", "\\#")
+            .replace(">", "\\>")
+            .replace("|", "\\|");
+        ctx.send(CreateReply::default().content(escaped_content)).await?;
     } else {
-        ctx.send(CreateReply::default().embed(create_error_embed(&format!("Tag `{}` does not exist", name))))
+   
+        let escaped_name = name.replace("`", "\\`");
+        ctx.send(CreateReply::default().embed(create_error_embed(&format!("Tag `{}` does not exist", escaped_name))))
             .await?;
     }
 
