@@ -1,10 +1,10 @@
 use std::fmt;
-
 use poise::CreateReply;
 use tokio::task;
+use strsim::jaro_winkler;
 
+use crate::types::Error;
 use crate::{types::Context, Data, ExpectError, DB_POOL};
-
 use crate::commands::utils::create_error_embed;
 
 pub struct TagDb;
@@ -53,7 +53,6 @@ impl TagDb {
         })
         .await?
     }
-    
 
     pub async fn delete_tag(
         &self,
@@ -62,15 +61,17 @@ impl TagDb {
     ) -> Result<bool, Box<dyn std::error::Error + Send + Sync>> {
         let pool = DB_POOL.get().unwrap();
 
-        let table_name = format!("tags_{}", guild_id);
-        let name = name.to_string();
+        if let Some((fixed_name, _)) = fix_typos(name, guild_id).await? {
+            let table_name = format!("tags_{}", guild_id);
 
-        task::spawn_blocking(move || {
-            let conn = pool.get()?;
-            let modified = conn.execute(&format!("DELETE FROM {} WHERE name = ?1", table_name), [name])?;
-            Ok(modified != 0)
-        })
-        .await?
+            return task::spawn_blocking(move || {
+                let conn = pool.get()?;
+                let modified = conn.execute(&format!("DELETE FROM {} WHERE name = ?1", table_name), [fixed_name])?;
+                Ok(modified != 0)
+            })
+            .await?;
+        }
+        Ok(false)
     }
 
     pub async fn edit_tag(
@@ -81,34 +82,38 @@ impl TagDb {
     ) -> Result<bool, Box<dyn std::error::Error + Send + Sync>> {
         let pool = DB_POOL.get().unwrap();
 
-        let table_name = format!("tags_{}", guild_id);
-        let name = name.to_string();
-        let content = content.to_string();
-        
-        task::spawn_blocking(move || {
-            let conn = pool.get()?;
-            let modified = conn.execute(&format!(
-                "UPDATE {} SET content = ?1 WHERE name = ?2", table_name),
-                [content, name],
-            )?;
-            Ok(modified != 0)
-        })
-        .await?
+        if let Some((fixed_name, _)) = fix_typos(name, guild_id).await? {
+            let table_name = format!("tags_{}", guild_id);
+            let content = content.to_string();
+            
+            return task::spawn_blocking(move || {
+                let conn = pool.get()?;
+                let modified = conn.execute(
+                    &format!("UPDATE {} SET content = ?1 WHERE name = ?2", table_name),
+                    [content, fixed_name],
+                )?;
+                Ok(modified != 0)
+            })
+            .await?;
+        }
+        Ok(false)
     }
 
-    pub async fn get_tag(
+    async fn get_tag_exact(
         &self,
         name: &str,
         guild_id: u64,
     ) -> Result<Option<(String, String)>, Box<dyn std::error::Error + Send + Sync>> {
         let pool = DB_POOL.get().unwrap();
-
         let table_name = format!("tags_{}", guild_id);
         let name = name.to_string();
 
         task::spawn_blocking(move || {
             let conn = pool.get()?;
-            let mut stmt = conn.prepare(&format!("SELECT name, content FROM {} WHERE name = ?1", table_name))?;
+            let mut stmt = conn.prepare(&format!(
+                "SELECT name, content FROM {} WHERE name = ?1",
+                table_name
+            ))?;
             let mut rows = stmt.query([name])?;
 
             if let Some(row) = rows.next()? {
@@ -118,6 +123,18 @@ impl TagDb {
             }
         })
         .await?
+    }
+
+    pub async fn get_tag(
+        &self,
+        name: &str,
+        guild_id: u64,
+    ) -> Result<Option<(String, String)>, Box<dyn std::error::Error + Send + Sync>> {
+        if let Some((fixed_name, content)) = fix_typos(name, guild_id).await? {
+            println!("name: {}", fixed_name);
+            return Ok(Some((fixed_name, content)));
+        }
+        Ok(None)
     }
 
     pub async fn get_all_tags(
@@ -159,15 +176,15 @@ impl From<serenity::Error> for CtxError {
 }
 
 impl fmt::Display for CtxError {
-	fn fmt(
-		&self,
-		f: &mut fmt::Formatter<'_>,
-	) -> fmt::Result {
-		match self {
-			| CtxError::NotGuild() => write!(f, "Not in Server"),
-            | CtxError::Discord(e) => write!(f, "{}", e),
-		}
-	}
+    fn fmt(
+        &self,
+        f: &mut fmt::Formatter<'_>,
+    ) -> fmt::Result {
+        match self {
+            CtxError::NotGuild() => write!(f, "Not in Server"),
+            CtxError::Discord(e) => write!(f, "{}", e),
+        }
+    }
 }
 
 pub async fn get_data_and_id(ctx: Context<'_>) -> Result<(&Data, u64), CtxError> {
@@ -175,11 +192,35 @@ pub async fn get_data_and_id(ctx: Context<'_>) -> Result<(&Data, u64), CtxError>
 
     let id = match ctx.guild_id() {
         Some(id) => id.get(),
-        _ => {
-            ctx.send(CreateReply::default().embed(create_error_embed("Tags are only avaible in servers"))).await?;
+        None => {
+            ctx.send(CreateReply::default().embed(create_error_embed("Tags are only available in servers"))).await?;
             return Err(CtxError::NotGuild())
         },
     };
 
     Ok((data, id))
+}
+
+async fn fix_typos(name: &str, guild_id: u64) -> Result<Option<(String, String)>, Error> {
+    let all_tags = TagDb.get_all_tags(guild_id).await?;
+    if all_tags.is_empty() {
+        return Ok(None);
+    }
+
+    let best_match = all_tags.iter().max_by(|a, b| {
+        jaro_winkler(name, a)
+            .partial_cmp(&jaro_winkler(name, b))
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+
+    if let Some(best) = best_match {
+        let similarity = jaro_winkler(name, best);
+        if similarity > 0.80 {
+            if let Some((name, content)) = TagDb.get_tag_exact(best, guild_id).await? {
+                return Ok(Some((name, content)));
+            }
+        }
+    }
+    
+    Ok(None)
 }

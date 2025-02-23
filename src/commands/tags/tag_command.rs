@@ -25,7 +25,7 @@ pub async fn tag(
         }
         ctx.send(builder).await?;
     } else {
-        ctx.send(CreateReply::default().embed(create_error_embed("Tag not found")))
+        ctx.send(CreateReply::default().embed(create_error_embed(&format!("Tag `{}` does not exist", name))))
             .await?;
     }
 
@@ -67,7 +67,7 @@ async fn delete(
                 .await?
         }
         Ok(false) => {
-            ctx.send(CreateReply::default().embed(create_error_embed("Tag not found")))
+            ctx.send(CreateReply::default().embed(create_error_embed(&format!("Tag `{}` does not exist", name))))
                 .await?
         }
         Err(e) => {
@@ -94,7 +94,7 @@ async fn edit(
         }
         Ok(false) => {
             ctx.send(
-                CreateReply::default().embed(create_error_embed("Tag not found")),
+                CreateReply::default().embed(create_error_embed(&format!("Tag `{}` does not exist", name))),
             )
             .await?
         }
@@ -147,7 +147,7 @@ async fn preview(
         ctx.send(CreateReply::default().content(content).ephemeral(true)).await?;
     } else {
         ctx.send(
-            CreateReply::default().embed(create_error_embed("Tag not found")).ephemeral(true)
+            CreateReply::default().embed(create_error_embed(&format!("Tag `{}` does not exist", name))).ephemeral(true)
         ).await?;
     }
     Ok(())
@@ -163,7 +163,7 @@ async fn raw(
     if let Ok(Some((_name, content))) = data.tag_db.get_tag(&name, id).await {
         ctx.send(CreateReply::default().content(content.replace("`", "\\`"))).await?;
     } else {
-        ctx.send(CreateReply::default().embed(create_error_embed("Tag not found")))
+        ctx.send(CreateReply::default().embed(create_error_embed(&format!("Tag `{}` does not exist", name))))
             .await?;
     }
 
@@ -189,7 +189,7 @@ async fn alias(
             }
         };
     } else {
-        ctx.send(CreateReply::default().embed(create_error_embed("Tag not found")))
+        ctx.send(CreateReply::default().embed(create_error_embed(&format!("Tag `{}` does not exist", name))))
             .await?;
     }
     Ok(())
