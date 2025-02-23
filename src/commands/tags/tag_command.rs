@@ -62,11 +62,10 @@ async fn delete(
     let (data, id) = get_data_and_id(ctx).await?;
 
     match data.tag_db.delete_tag(&name, id).await {
-        Ok(true) => {
-            ctx.send(CreateReply::default().content(format!("Deleted tag `{}`", name)))
-                .await?
+        Ok(Some(fixed_name)) => {
+            ctx.send(CreateReply::default().content(format!("Deleted tag `{}`", fixed_name))).await?
         }
-        Ok(false) => {
+        Ok(None) => {
             ctx.send(CreateReply::default().embed(create_error_embed(&format!("Tag `{}` does not exist", name))))
                 .await?
         }
@@ -88,11 +87,10 @@ async fn edit(
     let (data, id) = get_data_and_id(ctx).await?;
 
     match data.tag_db.edit_tag(&name, &content, id).await {
-        Ok(true) => {
-            ctx.send(CreateReply::default().content(format!("Updated tag `{}`", name)))
-                .await?
+        Ok(Some(fixed_name)) => {
+            ctx.send(CreateReply::default().content(format!("Updated tag `{}`", fixed_name))).await?
         }
-        Ok(false) => {
+        Ok(None) => {
             ctx.send(
                 CreateReply::default().embed(create_error_embed(&format!("Tag `{}` does not exist", name))),
             )

@@ -58,35 +58,44 @@ impl TagDb {
         &self,
         name: &str,
         guild_id: u64,
-    ) -> Result<bool, Box<dyn std::error::Error + Send + Sync>> {
+    ) -> Result<Option<String>, Box<dyn std::error::Error + Send + Sync>> {
         let pool = DB_POOL.get().unwrap();
-
+    
         if let Some((fixed_name, _)) = fix_typos(name, guild_id).await? {
             let table_name = format!("tags_{}", guild_id);
-
-            return task::spawn_blocking(move || {
+            let fixed_name_clone = fixed_name.clone();
+    
+            let deleted = task::spawn_blocking(move || -> Result<bool, Box<dyn std::error::Error + Send + Sync>> {
                 let conn = pool.get()?;
                 let modified = conn.execute(&format!("DELETE FROM {} WHERE name = ?1", table_name), [fixed_name])?;
                 Ok(modified != 0)
             })
-            .await?;
+            .await??;
+    
+            if deleted {
+                Ok(Some(fixed_name_clone))
+            } else {
+                Ok(None)
+            }
+        } else {
+            Ok(None)
         }
-        Ok(false)
     }
-
+    
     pub async fn edit_tag(
         &self,
         name: &str,
         content: &str,
         guild_id: u64,
-    ) -> Result<bool, Box<dyn std::error::Error + Send + Sync>> {
+    ) -> Result<Option<String>, Box<dyn std::error::Error + Send + Sync>> {
         let pool = DB_POOL.get().unwrap();
-
+    
         if let Some((fixed_name, _)) = fix_typos(name, guild_id).await? {
             let table_name = format!("tags_{}", guild_id);
             let content = content.to_string();
+            let fixed_name_clone = fixed_name.clone();
             
-            return task::spawn_blocking(move || {
+            let edited = task::spawn_blocking(move || -> Result<bool, Box<dyn std::error::Error + Send + Sync>> {
                 let conn = pool.get()?;
                 let modified = conn.execute(
                     &format!("UPDATE {} SET content = ?1 WHERE name = ?2", table_name),
@@ -94,9 +103,16 @@ impl TagDb {
                 )?;
                 Ok(modified != 0)
             })
-            .await?;
+            .await??;
+    
+            if edited {
+                Ok(Some(fixed_name_clone))
+            } else {
+                Ok(None)
+            }
+        } else {
+            Ok(None)
         }
-        Ok(false)
     }
 
     async fn get_tag_exact(
