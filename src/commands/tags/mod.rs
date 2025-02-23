@@ -3,3 +3,4 @@
 
 pub mod dtag_command;
 pub mod tag_command;
+pub mod tag_utils;

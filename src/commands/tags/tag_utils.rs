@@ -5,7 +5,7 @@ use tokio::task;
 
 use crate::{types::Context, Data, ExpectError, DB_POOL};
 
-use super::utils::create_error_embed;
+use crate::commands::utils::create_error_embed;
 
 pub struct TagDb;
 
@@ -24,7 +24,7 @@ impl TagDb {
         let conn = pool.get().expect_error("Failed to get database connection");
     
         let table_name = format!("tags_{}", guild_id);
-    
+
         conn.execute(
             &format!(
                 "CREATE TABLE IF NOT EXISTS {} (
@@ -119,6 +119,28 @@ impl TagDb {
         })
         .await?
     }
+
+    pub async fn get_all_tags(
+        &self,
+        guild_id: u64,
+    ) -> Result<Vec<String>, Box<dyn std::error::Error + Send + Sync>> {
+        let pool = DB_POOL.get().unwrap();
+        let table_name = format!("tags_{}", guild_id);
+    
+        task::spawn_blocking(move || {
+            let conn = pool.get()?;
+            let mut stmt = conn.prepare(&format!("SELECT name FROM {}", table_name))?;
+            let rows = stmt.query_map([], |row| row.get(0))?;
+    
+            let mut tags = Vec::new();
+            for tag in rows {
+                tags.push(tag?);
+            }
+    
+            Ok(tags)
+        })
+        .await?
+    }    
 }
 
 #[derive(Debug)]

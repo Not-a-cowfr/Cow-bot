@@ -4,7 +4,6 @@
 mod color_command;
 mod get_linked_account_command;
 mod uptime_command;
-pub mod tag_utils;
 pub mod tags;
 pub mod utils;
 

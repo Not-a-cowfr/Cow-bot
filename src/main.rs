@@ -6,7 +6,7 @@ use std::env::var;
 use std::sync::Arc;
 use std::time::Duration;
 
-use commands::tag_utils::TagDb;
+use commands::tags::tag_utils::TagDb;
 use data::database::create_users_table;
 use dotenv::dotenv;
 use mongodb::Client;

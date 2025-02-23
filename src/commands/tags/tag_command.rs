@@ -1,10 +1,11 @@
 use poise::CreateReply;
-use crate::commands::tag_utils::get_data_and_id;
+use serenity::all::CreateEmbed;
+use crate::commands::tags::tag_utils::get_data_and_id;
 use crate::{Context, Error};
 
-use crate::commands::utils::create_error_embed;
+use crate::commands::utils::{create_error_embed, get_color};
 
-#[poise::command(prefix_command, subcommands("create", "edit", "delete"))]
+#[poise::command(prefix_command, subcommands("create", "edit", "delete", "list"))]
 pub async fn tag(
     ctx: Context<'_>,
     #[description = "Tag name"]
@@ -31,7 +32,7 @@ pub async fn tag(
     Ok(())
 }
 
-#[poise::command(prefix_command)]
+#[poise::command(prefix_command, slash_command)]
 async fn create(
     ctx: Context<'_>,
     #[description = "Tag name"] name: String,
@@ -53,7 +54,7 @@ async fn create(
     Ok(())
 }
 
-#[poise::command(prefix_command)]
+#[poise::command(prefix_command, slash_command)]
 async fn delete(
     ctx: Context<'_>,
     #[description = "Tag name"] name: String,
@@ -76,7 +77,7 @@ async fn delete(
     Ok(())
 }
 
-#[poise::command(prefix_command)]
+#[poise::command(prefix_command, slash_command)]
 async fn edit(
     ctx: Context<'_>,
     #[description = "Tag name"] name: String,

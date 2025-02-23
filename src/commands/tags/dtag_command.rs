@@ -1,6 +1,6 @@
 use poise::CreateReply;
 
-use crate::{commands::{tag_utils::get_data_and_id, utils::create_error_embed}, Context, Error};
+use crate::{commands::{tags::tag_utils::get_data_and_id, utils::create_error_embed}, Context, Error};
 
 #[poise::command(prefix_command)]
 pub async fn dtag(
