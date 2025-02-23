@@ -5,7 +5,7 @@ use crate::{Context, Error};
 
 use crate::commands::utils::{create_error_embed, get_color};
 
-#[poise::command(prefix_command, slash_command, subcommands("create", "edit", "delete", "list", "preview", "raw"), invoke_on_edit, reuse_response)]
+#[poise::command(prefix_command, slash_command, subcommands("create", "edit", "delete", "list", "preview", "raw", "alias"), invoke_on_edit, reuse_response)]
 pub async fn tag(
     ctx: Context<'_>,
     #[description = "Tag name"]
@@ -33,7 +33,7 @@ pub async fn tag(
 }
 
 #[poise::command(prefix_command, slash_command, invoke_on_edit, reuse_response)]
-pub async fn create(
+async fn create(
     ctx: Context<'_>,
     #[description = "Tag name"] name: String,
     #[description = "Tag content"]
@@ -167,5 +167,30 @@ async fn raw(
             .await?;
     }
 
+    Ok(())
+}
+
+#[poise::command(prefix_command, slash_command, invoke_on_edit, reuse_response)]
+async fn alias(
+    ctx: Context<'_>,
+    #[description = "Tag name"] name: String,
+    #[description = "Tag alias"] alias: String,
+) -> Result<(), Error> {
+    let (data, id) = get_data_and_id(ctx).await?;
+
+    if let Ok(Some((_name, content))) = data.tag_db.get_tag(&name, id).await {
+        match data.tag_db.create_tag(&alias, &content, id).await {
+            Ok(_) => {
+                ctx.send(CreateReply::default().content(format!("Created tag alias `{}`", alias)))
+                    .await?
+            }
+            Err(e) => {
+                ctx.send(CreateReply::default().embed(create_error_embed(&e.to_string()))).await?
+            }
+        };
+    } else {
+        ctx.send(CreateReply::default().embed(create_error_embed("Tag not found")))
+            .await?;
+    }
     Ok(())
 }
