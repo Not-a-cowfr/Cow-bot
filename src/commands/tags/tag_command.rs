@@ -5,7 +5,7 @@ use crate::{Context, Error};
 
 use crate::commands::utils::{create_error_embed, get_color};
 
-#[poise::command(prefix_command, slash_command, subcommands("create", "edit", "delete", "list", "preview"), invoke_on_edit, reuse_response)]
+#[poise::command(prefix_command, slash_command, subcommands("create", "edit", "delete", "list", "preview", "raw"), invoke_on_edit, reuse_response)]
 pub async fn tag(
     ctx: Context<'_>,
     #[description = "Tag name"]
@@ -150,5 +150,22 @@ async fn preview(
             CreateReply::default().embed(create_error_embed("Tag not found")).ephemeral(true)
         ).await?;
     }
+    Ok(())
+}
+
+#[poise::command(prefix_command, slash_command, invoke_on_edit, reuse_response)]
+async fn raw(
+    ctx: Context<'_>,
+    #[description = "Tag name"] name: String,
+) -> Result<(), Error> {
+    let (data, id) = get_data_and_id(ctx).await?;
+
+    if let Ok(Some((_name, content))) = data.tag_db.get_tag(&name, id).await {
+        ctx.send(CreateReply::default().content(content.replace("`", "\\`"))).await?;
+    } else {
+        ctx.send(CreateReply::default().embed(create_error_embed("Tag not found")))
+            .await?;
+    }
+
     Ok(())
 }
