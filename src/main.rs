@@ -6,11 +6,14 @@ use std::env::var;
 use std::sync::Arc;
 use std::time::Duration;
 
+use commands::tag_utils::TagDb;
 use data::database::create_users_table;
 use dotenv::dotenv;
 use mongodb::Client;
 use mongodb::options::ClientOptions;
 use poise::serenity_prelude as serenity;
+use r2d2::Pool;
+use r2d2_sqlite::SqliteConnectionManager;
 use tasks::update_uptime::uptime_updater;
 use tokio::sync::OnceCell;
 use types::{Context, Error};
@@ -20,11 +23,14 @@ mod types {
 	pub type Context<'a> = poise::Context<'a, super::Data, Error>;
 }
 
-pub struct Data {}
+pub struct Data {
+	pub tag_db: Arc<TagDb>,
+}
 
 static MONGO_CLIENT: OnceCell<Client> = OnceCell::const_new();
 static API_KEY: OnceCell<String> = OnceCell::const_new();
 static ERROR_COLOR: OnceCell<u32> = OnceCell::const_new();
+static DB_POOL: OnceCell<Pool<SqliteConnectionManager>> = OnceCell::const_new();
 
 async fn init_global_data() {
 	API_KEY
@@ -35,7 +41,7 @@ async fn init_global_data() {
 		.expect_error("API_KEY can only be initialized once");
 
 	let mongo_url = var("MONGO_URL")
-		.expect_error("Missing `API_KEY` env var, please include this in your .env file");
+		.expect_error("Missing `MONGO_URL` env var, please include this in your .env file");
 	let options = ClientOptions::parse(mongo_url)
 		.await
 		.expect_error("Could not create mongo client options");
@@ -47,7 +53,14 @@ async fn init_global_data() {
 
 	ERROR_COLOR
 		.set(0x770505)
-		.expect_error("ERROR_COLOR can only be initialized once")
+		.expect_error("ERROR_COLOR can only be initialized once");
+
+	let manager = SqliteConnectionManager::file("src/data/tags.db");
+	let pool = Pool::new(manager).expect_error("Failed to create connection pool");
+
+	DB_POOL
+		.set(pool)
+		.expect_error("DB_POOL can only be initialized once");
 }
 
 async fn on_error(error: poise::FrameworkError<'_, Data, Error>) {
@@ -93,7 +106,7 @@ async fn main() {
 	let options = poise::FrameworkOptions {
 		commands: commands::get_all_commands(),
 		prefix_options: poise::PrefixFrameworkOptions {
-			prefix: Some("-".into()),
+			prefix: Some("cow ".into()),
 			edit_tracker: Some(Arc::new(poise::EditTracker::for_timespan(
 				Duration::from_secs(3600),
 			))),
@@ -128,7 +141,9 @@ async fn main() {
 			Box::pin(async move {
 				println!("Logged in as {}", _ready.user.name);
 				poise::builtins::register_globally(ctx, &framework.options().commands).await?;
-				Ok(Data {})
+				Ok(Data {
+					tag_db: Arc::new(TagDb),
+				})
 			})
 		})
 		.options(options)
