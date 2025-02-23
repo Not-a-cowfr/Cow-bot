@@ -5,7 +5,7 @@ use crate::{Context, Error};
 
 use crate::commands::utils::{create_error_embed, get_color};
 
-#[poise::command(prefix_command, slash_command, subcommands("create", "edit", "delete", "list"), invoke_on_edit, reuse_response)]
+#[poise::command(prefix_command, slash_command, subcommands("create", "edit", "delete", "list", "preview"), invoke_on_edit, reuse_response)]
 pub async fn tag(
     ctx: Context<'_>,
     #[description = "Tag name"]
@@ -18,7 +18,7 @@ pub async fn tag(
 
     let (data, id) = get_data_and_id(ctx).await?;
 
-    if let Ok(Some(content)) = data.tag_db.get_tag(&name, id).await {
+    if let Ok(Some((_name, content))) = data.tag_db.get_tag(&name, id).await {
         let mut builder = CreateReply::default().content(content);
         if is_reply {
             builder = builder.reply(true);
@@ -133,5 +133,22 @@ async fn list(
             ctx.send(CreateReply::default().embed(create_error_embed(&e.to_string()))).await?
         }
     };
+    Ok(())
+}
+
+#[poise::command(prefix_command, slash_command, invoke_on_edit, reuse_response)]
+async fn preview(
+    ctx: Context<'_>,
+    #[description = "Tag name"] name: String,
+) -> Result<(), Error> {
+    let (data, id) = get_data_and_id(ctx).await?;
+
+    if let Ok(Some((_name, content))) = data.tag_db.get_tag(&name, id).await {
+        ctx.send(CreateReply::default().content(content).ephemeral(true)).await?;
+    } else {
+        ctx.send(
+            CreateReply::default().embed(create_error_embed("Tag not found"))
+        ).await?;
+    }
     Ok(())
 }

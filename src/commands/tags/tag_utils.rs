@@ -100,7 +100,7 @@ impl TagDb {
         &self,
         name: &str,
         guild_id: u64,
-    ) -> Result<Option<String>, Box<dyn std::error::Error + Send + Sync>> {
+    ) -> Result<Option<(String, String)>, Box<dyn std::error::Error + Send + Sync>> {
         let pool = DB_POOL.get().unwrap();
 
         let table_name = format!("tags_{}", guild_id);
@@ -108,11 +108,11 @@ impl TagDb {
 
         task::spawn_blocking(move || {
             let conn = pool.get()?;
-            let mut stmt = conn.prepare(&format!("SELECT content FROM {} WHERE name = ?1", table_name))?;
+            let mut stmt = conn.prepare(&format!("SELECT name, content FROM {} WHERE name = ?1", table_name))?;
             let mut rows = stmt.query([name])?;
 
             if let Some(row) = rows.next()? {
-                Ok(Some(row.get(0)?))
+                Ok(Some((row.get(0)?, row.get(1)?)))
             } else {
                 Ok(None)
             }

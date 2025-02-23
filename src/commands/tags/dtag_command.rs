@@ -16,7 +16,7 @@ pub async fn dtag(
 
     let (data, id) = get_data_and_id(ctx).await?;
     
-    if let Ok(Some(content)) = data.tag_db.get_tag(&name, id).await {
+    if let Ok(Some((_name, content))) = data.tag_db.get_tag(&name, id).await {
         let builder = if is_reply {
             CreateReply::default().content(content).reply(true)
         } else {
