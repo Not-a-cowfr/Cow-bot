@@ -136,7 +136,7 @@ async fn list(
     Ok(())
 }
 
-#[poise::command(prefix_command, slash_command, invoke_on_edit, reuse_response)]
+#[poise::command(slash_command, invoke_on_edit, reuse_response)]
 async fn preview(
     ctx: Context<'_>,
     #[description = "Tag name"] name: String,
@@ -147,7 +147,7 @@ async fn preview(
         ctx.send(CreateReply::default().content(content).ephemeral(true)).await?;
     } else {
         ctx.send(
-            CreateReply::default().embed(create_error_embed("Tag not found"))
+            CreateReply::default().embed(create_error_embed("Tag not found")).ephemeral(true)
         ).await?;
     }
     Ok(())
