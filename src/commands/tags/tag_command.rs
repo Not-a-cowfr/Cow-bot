@@ -104,3 +104,34 @@ async fn edit(
     };
     Ok(())
 }
+
+#[poise::command(prefix_command, slash_command)]
+async fn list(
+    ctx: Context<'_>,
+) -> Result<(), Error> {
+    let (data, id) = get_data_and_id(ctx).await?;
+
+    let color = get_color(&ctx.author().name);
+
+    match data.tag_db.get_all_tags(id).await {
+        Ok(tags) => {
+            let formatted_tags = if tags.is_empty() {
+                "No tags found. try creating a tag with `/tag create`".to_string()
+            } else {
+                tags.join(", ")
+            };
+    
+            ctx.send(CreateReply::default().embed(
+                CreateEmbed::default()
+                    .title("All Commands")
+                    .description(formatted_tags)
+                    .color(color),
+            ))
+            .await?
+        }
+        Err(e) => {
+            ctx.send(CreateReply::default().embed(create_error_embed(&e.to_string()))).await?
+        }
+    };
+    Ok(())
+}
