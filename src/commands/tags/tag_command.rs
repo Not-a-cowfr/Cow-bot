@@ -5,7 +5,7 @@ use crate::{Context, Error};
 
 use crate::commands::utils::{create_error_embed, get_color};
 
-#[poise::command(prefix_command, subcommands("create", "edit", "delete", "list"))]
+#[poise::command(prefix_command, slash_command, subcommands("create", "edit", "delete", "list"), invoke_on_edit, reuse_response)]
 pub async fn tag(
     ctx: Context<'_>,
     #[description = "Tag name"]
@@ -32,8 +32,8 @@ pub async fn tag(
     Ok(())
 }
 
-#[poise::command(prefix_command, slash_command)]
-async fn create(
+#[poise::command(prefix_command, slash_command, invoke_on_edit, reuse_response)]
+pub async fn create(
     ctx: Context<'_>,
     #[description = "Tag name"] name: String,
     #[description = "Tag content"]
@@ -54,7 +54,7 @@ async fn create(
     Ok(())
 }
 
-#[poise::command(prefix_command, slash_command)]
+#[poise::command(prefix_command, slash_command, invoke_on_edit, reuse_response)]
 async fn delete(
     ctx: Context<'_>,
     #[description = "Tag name"] name: String,
@@ -77,7 +77,7 @@ async fn delete(
     Ok(())
 }
 
-#[poise::command(prefix_command, slash_command)]
+#[poise::command(prefix_command, slash_command, invoke_on_edit, reuse_response)]
 async fn edit(
     ctx: Context<'_>,
     #[description = "Tag name"] name: String,
@@ -105,7 +105,7 @@ async fn edit(
     Ok(())
 }
 
-#[poise::command(prefix_command, slash_command)]
+#[poise::command(prefix_command, slash_command, invoke_on_edit, reuse_response)]
 async fn list(
     ctx: Context<'_>,
 ) -> Result<(), Error> {
