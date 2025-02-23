@@ -4,7 +4,7 @@ use crate::{Context, Error};
 
 use crate::commands::utils::create_error_embed;
 
-#[poise::command(prefix_command, slash_command, subcommands("create", "edit", "delete"))]
+#[poise::command(prefix_command, subcommands("create", "edit", "delete"))]
 pub async fn tag(
     ctx: Context<'_>,
     #[description = "Tag name"]
@@ -31,7 +31,7 @@ pub async fn tag(
     Ok(())
 }
 
-#[poise::command(prefix_command, slash_command)]
+#[poise::command(prefix_command)]
 async fn create(
     ctx: Context<'_>,
     #[description = "Tag name"] name: String,
@@ -53,7 +53,7 @@ async fn create(
     Ok(())
 }
 
-#[poise::command(prefix_command, slash_command)]
+#[poise::command(prefix_command)]
 async fn delete(
     ctx: Context<'_>,
     #[description = "Tag name"] name: String,
@@ -76,7 +76,7 @@ async fn delete(
     Ok(())
 }
 
-#[poise::command(prefix_command, slash_command)]
+#[poise::command(prefix_command)]
 async fn edit(
     ctx: Context<'_>,
     #[description = "Tag name"] name: String,
