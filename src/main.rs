@@ -149,7 +149,7 @@ async fn main() {
 		.options(options)
 		.build();
 
-	/*tokio::task::spawn_blocking(move || {
+	tokio::task::spawn_blocking(move || {
 		if let Err(err) = tokio::runtime::Handle::current().block_on(uptime_updater(
 			&API_KEY.get().unwrap(),
 			MONGO_CLIENT
@@ -163,7 +163,7 @@ async fn main() {
 				err
 			);
 		}
-	});*/
+	});
 
 	let token = var("BOT_TOKEN").expect_error(
 		"\x1b[31;1m[ERROR] Missing `BOT_TOKEN` env var, please include this in your .env file",
