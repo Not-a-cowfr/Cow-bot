@@ -1,5 +1,5 @@
 use poise::CreateReply;
-use serenity::all::CreateEmbed;
+use serenity::all::{CreateEmbed, CreateMessage};
 use crate::commands::tags::tag_utils::get_data_and_id;
 use crate::{Context, Error};
 
@@ -11,22 +11,28 @@ pub async fn tag(
     #[description = "Tag name"]
     name: String,
 ) -> Result<(), Error> {
-    let is_reply = match &ctx {
-        Context::Prefix(prefix_ctx) => prefix_ctx.msg.referenced_message.is_some(),
-        _ => false,
+    let referenced_message = match &ctx {
+        Context::Prefix(prefix_ctx) => prefix_ctx.msg.message_reference.clone(),
+        _ => None,
     };
 
     let (data, id) = get_data_and_id(ctx).await?;
 
     if let Ok(Some((_name, content))) = data.tag_db.get_tag(&name, id).await {
-        let mut builder = CreateReply::default().content(content);
-        if is_reply {
-            builder = builder.reply(true);
+        let mut message = CreateMessage::default().content(content);
+        
+        if let Some(msg_id) = referenced_message {
+            message = message.reference_message(msg_id);
         }
-        ctx.send(builder).await?;
-    } else {
-        ctx.send(CreateReply::default().embed(create_error_embed(&format!("Tag `{}` does not exist", name))))
+        
+        ctx.channel_id()
+            .send_message(ctx.serenity_context(), message)
             .await?;
+    } else {
+        ctx.send(
+            CreateReply::default()
+                .embed(create_error_embed(&format!("Tag `{}` does not exist", name)))
+        ).await?;
     }
 
     Ok(())

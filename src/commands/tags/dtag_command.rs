@@ -1,4 +1,5 @@
 use poise::CreateReply;
+use serenity::all::CreateMessage;
 
 use crate::{commands::{tags::tag_utils::get_data_and_id, utils::create_error_embed}, Context, Error};
 
@@ -8,26 +9,32 @@ pub async fn dtag(
     #[description = "Tag name"] name: String,
 ) -> Result<(), Error> {
     let msg = match &ctx {
-        Context::Prefix(prefix_ctx) => prefix_ctx.msg,
-        _ => panic!("dtag may only be used with a prefix command"),
+        Context::Prefix(prefix_ctx) => Some(prefix_ctx.msg),
+        _ => None,
     };
-
-    let is_reply = msg.referenced_message.is_some();
+    
+    let referenced_message = msg.and_then(|m| m.message_reference.clone());    
 
     let (data, id) = get_data_and_id(ctx).await?;
-    
-    if let Ok(Some((_name, content))) = data.tag_db.get_tag(&name, id).await {
-        let builder = if is_reply {
-            CreateReply::default().content(content).reply(true)
-        } else {
-            CreateReply::default().content(content)
-        };
 
-        ctx.send(builder).await?;
-    } else {
-        ctx.send(CreateReply::default().embed(create_error_embed("Tag not found")))
+    if let Ok(Some((_name, content))) = data.tag_db.get_tag(&name, id).await {
+        let mut message = CreateMessage::default().content(content);
+        
+        if let Some(msg_id) = referenced_message {
+            message = message.reference_message(msg_id);
+        }
+        
+        ctx.channel_id()
+            .send_message(ctx.serenity_context(), message)
             .await?;
+    } else {
+        ctx.send(
+            CreateReply::default()
+                .embed(create_error_embed(&format!("Tag `{}` does not exist", name)))
+        ).await?;
     }
-    msg.delete(&ctx.serenity_context()).await?;
+    if let Some(msg) = msg {
+        msg.delete(ctx.serenity_context()).await?;
+    }
     Ok(())
 }
