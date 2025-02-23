@@ -13,7 +13,7 @@
 - Fill out required environment variables
     - Create a copy of [.env.example](.env.example) and rename it to `.env`
     - Get your hypixel api key from the [developer dashboard](https://developer.hypixel.net/)
-    - Create a [discord bot](https://discord.com/developers/docs/resources/application) and copy its private token
+    - Create a [discord bot](https://discord.com/developers/applications) and copy its private token
     - Setup a MongoDb server however you like and copy the url
 - Run `cargo run --profile dev` or use [Code Runner](https://marketplace.visualstudio.com/items?itemName=formulahendry.code-runner) VSCode extension and click run
 

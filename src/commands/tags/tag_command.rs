@@ -8,8 +8,7 @@ use crate::commands::utils::{create_error_embed, get_color};
 #[poise::command(prefix_command, slash_command, subcommands("create", "edit", "delete", "list", "preview", "raw", "alias"), invoke_on_edit, reuse_response)]
 pub async fn tag(
     ctx: Context<'_>,
-    #[description = "Tag name"]
-    name: String,
+    #[description = "Tag name"] name: String,
 ) -> Result<(), Error> {
     let referenced_message = match &ctx {
         Context::Prefix(prefix_ctx) => prefix_ctx.msg.message_reference.clone(),
@@ -38,6 +37,7 @@ pub async fn tag(
     Ok(())
 }
 
+/// Create a new tag
 #[poise::command(prefix_command, slash_command, invoke_on_edit, reuse_response)]
 async fn create(
     ctx: Context<'_>,
@@ -60,6 +60,7 @@ async fn create(
     Ok(())
 }
 
+/// Delete an existing tag
 #[poise::command(prefix_command, slash_command, invoke_on_edit, reuse_response)]
 async fn delete(
     ctx: Context<'_>,
@@ -82,6 +83,7 @@ async fn delete(
     Ok(())
 }
 
+/// Edit an existing tag
 #[poise::command(prefix_command, slash_command, invoke_on_edit, reuse_response)]
 async fn edit(
     ctx: Context<'_>,
@@ -109,6 +111,7 @@ async fn edit(
     Ok(())
 }
 
+/// List all tags for this server
 #[poise::command(prefix_command, slash_command, invoke_on_edit, reuse_response)]
 async fn list(
     ctx: Context<'_>,
@@ -140,6 +143,7 @@ async fn list(
     Ok(())
 }
 
+/// Preview a tag
 #[poise::command(slash_command, invoke_on_edit, reuse_response)]
 async fn preview(
     ctx: Context<'_>,
@@ -157,6 +161,7 @@ async fn preview(
     Ok(())
 }
 
+/// View a tag in raw text
 #[poise::command(prefix_command, slash_command, invoke_on_edit, reuse_response)]
 async fn raw(
     ctx: Context<'_>,
@@ -174,6 +179,7 @@ async fn raw(
     Ok(())
 }
 
+/// Create an alias for an existing tag
 #[poise::command(prefix_command, slash_command, invoke_on_edit, reuse_response)]
 async fn alias(
     ctx: Context<'_>,
