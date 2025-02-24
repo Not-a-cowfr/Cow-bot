@@ -34,4 +34,4 @@ pub async fn color(
     Ok(())
 }
 ```
-This will now be automatically generated as a command upon running
+This will now be automatically generated as a command upon running thanks to [build.rs](build.rs)

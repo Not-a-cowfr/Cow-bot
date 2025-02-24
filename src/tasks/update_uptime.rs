@@ -41,11 +41,11 @@ pub async fn uptime_updater(
 
 		let mut no_guild: u16 = 0;
 		for player in players {
-			if processed_uuids.contains(&player.clone()) {
+			if processed_uuids.contains(&player) {
 				continue;
 			}
 
-			match update_uptime(player.clone(), api_key, client.clone()).await {
+			match update_uptime(&player, api_key, client).await {
 				| Err(ApiError::NoGuild()) => no_guild += 1,
 				| _ => {},
 			};
@@ -115,7 +115,7 @@ struct Member {
 
 async fn get_guild_uptime_data(
 	api_key: &str,
-	uuid: String,
+	uuid: &String,
 ) -> Result<(String, HashMap<String, HashMap<String, i64>>), Box<dyn std::error::Error + Send + Sync>>
 {
 	let url = format!("https://api.hypixel.net/v2/guild?key={api_key}&player={uuid}");
@@ -144,12 +144,11 @@ async fn get_guild_uptime_data(
 }
 
 pub async fn update_uptime(
-	uuid: String,
+	uuid: &String,
 	api_key: &str,
-	client: Client,
+	client: &Client,
 ) -> Result<(), ApiError> {
-	let (guild_id, member_uptime_history) = match get_guild_uptime_data(api_key, uuid.clone()).await
-	{
+	let (guild_id, member_uptime_history) = match get_guild_uptime_data(api_key, uuid).await {
 		| Ok(result) => result,
 		| Err(e) => return Err(e.into()),
 	};
@@ -170,16 +169,16 @@ pub async fn update_uptime(
 			let date = BsonDateTime::from_chrono(Utc.from_utc_datetime(&naive_date));
 
 			let filter = doc! {
-				"uuid": uuid.clone(),
+				"uuid": &uuid,
 				"date": &date,
 			};
 
 			let update = doc! {
 				"_id": ObjectId::new(),
-				"uuid": uuid.clone(),
+				"uuid": &uuid,
 				"gexp": new_gexp,
 				"date": date,
-				"guild_id": guild_id.clone(),
+				"guild_id": &guild_id,
 			};
 
 			let model = ReplaceOneModel::builder()

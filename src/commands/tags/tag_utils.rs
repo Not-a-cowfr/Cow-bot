@@ -38,14 +38,13 @@ impl TagDb {
     
         let name = name.to_string();
         let content = content.to_string();
-        let table_name_clone = table_name.clone();
     
         task::spawn_blocking(move || {
             let conn = pool.get()?;
             conn.execute(
                 &format!(
                     "INSERT INTO {} (name, content) VALUES (?1, ?2)",
-                    table_name_clone
+                    table_name
                 ),
                 [&name, &content],
             )?;
@@ -63,20 +62,19 @@ impl TagDb {
     
         if let Some((fixed_name, _)) = fix_typos(name, guild_id).await? {
             let table_name = format!("tags_{}", guild_id);
-            let fixed_name_clone = fixed_name.clone();
     
-            let deleted = task::spawn_blocking(move || -> Result<bool, Box<dyn std::error::Error + Send + Sync>> {
+            let result = task::spawn_blocking(move || -> Result<Option<String>, Box<dyn std::error::Error + Send + Sync>> {
                 let conn = pool.get()?;
-                let modified = conn.execute(&format!("DELETE FROM {} WHERE name = ?1", table_name), [fixed_name])?;
-                Ok(modified != 0)
+                let modified = conn.execute(&format!("DELETE FROM {} WHERE name = ?1", table_name), [&fixed_name])?;
+                if modified != 0 {
+                    Ok(Some(fixed_name)) // Return the fixed_name if deleted
+                } else {
+                    Ok(None)
+                }
             })
             .await??;
     
-            if deleted {
-                Ok(Some(fixed_name_clone))
-            } else {
-                Ok(None)
-            }
+            Ok(result)
         } else {
             Ok(None)
         }
@@ -93,23 +91,22 @@ impl TagDb {
         if let Some((fixed_name, _)) = fix_typos(name, guild_id).await? {
             let table_name = format!("tags_{}", guild_id);
             let content = content.to_string();
-            let fixed_name_clone = fixed_name.clone();
-            
-            let edited = task::spawn_blocking(move || -> Result<bool, Box<dyn std::error::Error + Send + Sync>> {
+    
+            let result = task::spawn_blocking(move || -> Result<Option<String>, Box<dyn std::error::Error + Send + Sync>> {
                 let conn = pool.get()?;
                 let modified = conn.execute(
                     &format!("UPDATE {} SET content = ?1 WHERE name = ?2", table_name),
-                    [content, fixed_name],
+                    [&content, &fixed_name],
                 )?;
-                Ok(modified != 0)
+                if modified != 0 {
+                    Ok(Some(fixed_name))
+                } else {
+                    Ok(None)
+                }
             })
             .await??;
     
-            if edited {
-                Ok(Some(fixed_name_clone))
-            } else {
-                Ok(None)
-            }
+            Ok(result)
         } else {
             Ok(None)
         }

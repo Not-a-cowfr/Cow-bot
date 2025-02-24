@@ -8,5 +8,10 @@ pub mod tags;
 pub mod utils;
 
 pub fn get_all_commands() -> Vec<poise::Command<crate::Data, crate::types::Error>> {
-    vec![color_command::color(), get_linked_account_command::get_linked_account(), tags::dtag_command::dtag(), tags::tag_command::tag(), uptime_command::uptime()]
+    vec![
+		color_command::color(), 
+		get_linked_account_command::get_linked_account(), 
+		tags::dtag_command::dtag(), 
+		tags::tag_command::tag(), 
+		uptime_command::uptime()]
 }

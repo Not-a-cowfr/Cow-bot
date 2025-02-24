@@ -13,7 +13,7 @@ pub async fn color(
 ) -> Result<(), Error> {
 	let user = ctx.author();
 	let user_id = user.id.to_string();
-	let username = user.name.clone();
+	let username = &user.name;
 
 	let color = color.replace("#", "");
 
@@ -41,7 +41,7 @@ pub async fn color(
 		} else {
 			conn.execute(
 				"INSERT INTO users (username, userid, color) VALUES (?1, ?2, ?3)",
-				params![username, user_id, color_but_with_thingy],
+				params![*username, user_id, color_but_with_thingy],
 			)?;
 		}
 	}

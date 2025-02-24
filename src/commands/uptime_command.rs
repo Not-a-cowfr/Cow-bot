@@ -56,7 +56,7 @@ pub async fn uptime(
 		} else {
 			uptime = gexp_to_uptime_as_string(gexp)
 		}
-		description.push_str(&format!("{}: {}\n", BsonDateTime_to_string(date), uptime));
+		description.push_str(&format!("{}: {}\n", BsonDateTime_to_string(&date), uptime));
 	}
 
 	let color = get_color(&ctx.author().name);
@@ -80,7 +80,7 @@ fn get_uptime(
         let start_date: BsonDateTime =
             BsonDateTime::from_chrono(date - Duration::days(time_window));
         let filter: Document = doc! {
-            "uuid": uuid.clone(),
+            "uuid": &uuid,
             "date": { "$gte": start_date }
         };
 
@@ -94,14 +94,14 @@ fn get_uptime(
         while let Some(result) = cursor.next().await {
             let playtime: Uptime = result?;
             let date_str: String = playtime.date.to_string();
-            results.push((date_str, playtime.gexp));
+            results.push((date_str, playtime.gexp as i64));
         }
 
         if results.is_empty() {
 			update_uptime(
-				uuid.clone(),
+				&uuid,
 				API_KEY.get().expect("API_KEY is uninitialized"),
-				client.clone(),
+				&client,
 			).await?;
 			
 			let mut cursor = client
@@ -128,9 +128,9 @@ fn fill_missing_dates(
     let now = Utc::now();
     let start_date = now - Duration::days(time_window);
 
-    let mut date_map: std::collections::HashMap<String, i64> = results.clone()
-        .into_iter()
-        .map(|(date, gexp)| {(BsonDateTime_to_string(date), gexp)})
+    let date_map: std::collections::HashMap<String, i64> = results
+        .iter()
+        .map(|(date, gexp)| (BsonDateTime_to_string(date), *gexp))
         .collect();
 
     for i in results.len()..time_window as usize {
@@ -138,7 +138,7 @@ fn fill_missing_dates(
         let date_str = BsonDateTime::from_chrono(current_date).to_string();
         let normalized_date = current_date.format("%Y-%m-%d").to_string();
 
-        let gexp = date_map.remove(&normalized_date).unwrap_or(-1);
+        let gexp = date_map.get(&normalized_date).copied().unwrap_or(-1);
         results.push((date_str, gexp));
     }
 
@@ -151,6 +151,6 @@ fn gexp_to_uptime_as_string(gexp: i64) -> String {
 }
 
 #[allow(non_snake_case, dead_code)]
-fn BsonDateTime_to_string(date: String) -> String {
+fn BsonDateTime_to_string(date: &String) -> String {
 	format!("**{}**", date.get(..10).unwrap_or("Unknown Date"))
 }

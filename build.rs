@@ -66,13 +66,13 @@ fn process_dir(
 							if let Some(command_name) = filename.strip_suffix("_command") {
 								let function_path = if is_in_subdir {
 									format!(
-										"{}::{}::{}",
+										"\n\t\t{}::{}::{}",
 										parent_dir.unwrap(),
 										filename,
 										command_name
 									)
 								} else {
-									format!("{}::{}", filename, command_name)
+									format!("\n\t\t{}::{}", filename, command_name)
 								};
 								function_entries.push(format!("{}()", function_path));
 							}
