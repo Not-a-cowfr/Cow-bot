@@ -130,6 +130,10 @@ async fn main() {
 				println!("[EVENT HANDLER] {:?}", event.snake_case_name());
 
 				if let serenity::FullEvent::Message { new_message: msg } = event {
+					if msg.webhook_id.is_some() {
+						return Ok(());
+					}
+
 					let re = Regex::new(r"https://discord\.com/channels/(\d+)/(\d+)/(\d+)").unwrap();
 					if let Some(captures) = re.captures(&msg.content) {
 						let channel_id = captures[2].parse::<u64>().unwrap();
