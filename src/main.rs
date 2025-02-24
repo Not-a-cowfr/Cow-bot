@@ -14,6 +14,7 @@ use mongodb::options::ClientOptions;
 use poise::serenity_prelude as serenity;
 use r2d2::Pool;
 use r2d2_sqlite::SqliteConnectionManager;
+use regex::Regex;
 use tasks::update_uptime::uptime_updater;
 use tokio::sync::OnceCell;
 use types::{Context, Error};
@@ -127,6 +128,87 @@ async fn main() {
 		event_handler: |_ctx, event, _framework, _data| {
 			Box::pin(async move {
 				println!("[EVENT HANDLER] {:?}", event.snake_case_name());
+
+				if let serenity::FullEvent::Message { new_message: msg } = event {
+					let re = Regex::new(r"https://discord\.com/channels/(\d+)/(\d+)/(\d+)").unwrap();
+					if let Some(captures) = re.captures(&msg.content) {
+						let channel_id = captures[2].parse::<u64>().unwrap();
+						let message_id = captures[3].parse::<u64>().unwrap();
+				
+						let linked_msg = match serenity::ChannelId::new(channel_id)
+							.message(&_ctx.http, serenity::MessageId::new(message_id))
+							.await {
+							Ok(m) => m,
+							Err(e) => {
+								println!("[ERROR] Failed to fetch message: {:?}", e);
+								return Ok(());
+							}
+						};
+				
+						let sender_name = linked_msg.author.name.clone();
+						let sender_pfp = linked_msg.author.avatar_url().unwrap_or_default();
+				
+						let webhook = match msg.channel_id.webhooks(&_ctx.http).await {
+							Ok(webhooks) if !webhooks.is_empty() => webhooks[0].clone(),
+							_ => {
+								match msg.channel_id.create_webhook(&_ctx.http, serenity::CreateWebhook::new("MessagePreview")).await {
+									Ok(w) => w,
+									Err(e) => {
+										println!("[ERROR] Failed to create webhook: {:?}", e);
+										return Ok(());
+									}
+								}
+							}
+						};
+				
+						let mut webhook_builder = serenity::ExecuteWebhook::new()
+							.content(&linked_msg.content)
+							.username(&sender_name)
+							.avatar_url(&sender_pfp);
+				
+						if !linked_msg.embeds.is_empty() {
+							let mut create_embeds = Vec::new();
+							for embed in &linked_msg.embeds {
+								let mut create_embed = serenity::CreateEmbed::new();
+								if let Some(description) = &embed.description {
+									create_embed = create_embed.description(description);
+								}
+								if let Some(title) = &embed.title {
+									create_embed = create_embed.title(title);
+								}
+								if let Some(url) = &embed.url {
+									create_embed = create_embed.url(url);
+								}
+								if let Some(color) = embed.colour {
+									create_embed = create_embed.color(color.0);
+								}
+								create_embeds.push(create_embed);
+							}
+							webhook_builder = webhook_builder.embeds(create_embeds);
+						}
+				
+						if !linked_msg.attachments.is_empty() {
+							let http_client = reqwest::Client::new();
+							for attachment in &linked_msg.attachments {
+								match http_client.get(&attachment.url).send().await {
+									Ok(response) => {
+										if let Ok(bytes) = response.bytes().await {
+											let attachment_file = serenity::CreateAttachment::bytes(bytes.to_vec(), &attachment.filename);
+											webhook_builder = webhook_builder.add_file(attachment_file);
+										} else {
+											println!("[ERROR] Failed to fetch attachment: {}", attachment.url);
+										}
+									}
+									Err(e) => println!("[ERROR] Failed to fetch attachment {}: {:?}", attachment.url, e),
+								}
+							}
+						}
+				
+						if let Err(e) = webhook.execute(&_ctx.http, false, webhook_builder).await {
+							println!("[ERROR] Failed to create webhook: {:?}", e);
+						}
+					}
+				}
 				Ok(())
 			})
 		},

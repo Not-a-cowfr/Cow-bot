@@ -130,7 +130,7 @@ async fn list(
     
             ctx.send(CreateReply::default().embed(
                 CreateEmbed::default()
-                    .title("All Commands")
+                    .title("All Tags")
                     .description(formatted_tags)
                     .color(color),
             ))
