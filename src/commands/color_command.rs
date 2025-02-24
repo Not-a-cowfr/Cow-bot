@@ -6,7 +6,7 @@ use crate::{Context, Error};
 
 use super::utils::create_error_embed;
 
-#[poise::command(slash_command)]
+#[poise::command(slash_command, prefix_command, invoke_on_edit, reuse_response)]
 pub async fn color(
 	ctx: Context<'_>,
 	#[description = "Hex code"] color: String,

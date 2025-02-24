@@ -5,7 +5,6 @@ use crate::commands::utils::{create_error_embed, get_account_from_anything, get_
 use crate::{Context, Error};
 
 #[poise::command(
-	slash_command,
 	context_menu_command = "Get Linked Account",
 	ephemeral = true
 )]

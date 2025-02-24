@@ -1,5 +1,4 @@
 use std::pin::Pin;
-use std::time::Instant;
 
 use chrono::{DateTime, Duration, Utc};
 use futures::stream::StreamExt;
@@ -13,13 +12,12 @@ use crate::commands::utils::{create_error_embed, get_account_from_anything, get_
 use crate::tasks::update_uptime::{ApiError, Uptime, update_uptime};
 use crate::{Context, Error, API_KEY, MONGO_CLIENT};
 
-#[poise::command(slash_command)]
+#[poise::command(slash_command, prefix_command, invoke_on_edit, reuse_response)]
 pub async fn uptime(
 	ctx: Context<'_>,
 	#[description = "Username, UUID, or discord ID"] user: Option<String>,
 	#[description = "Time window, eg 7 for 7 days"] window: Option<i64>,
 ) -> Result<(), Error> {
-	let start = Instant::now();
 	ctx.defer().await?;
 
 	let user_input = user.unwrap_or_else(|| ctx.author().id.to_string());
@@ -66,7 +64,6 @@ pub async fn uptime(
 		.color(color);
 
 	ctx.send(CreateReply::default().embed(embed)).await?;
-	println!("time taken: {} ms", start.elapsed().as_millis());
 	Ok(())
 }
 

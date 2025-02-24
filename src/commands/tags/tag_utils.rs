@@ -67,7 +67,7 @@ impl TagDb {
                 let conn = pool.get()?;
                 let modified = conn.execute(&format!("DELETE FROM {} WHERE name = ?1", table_name), [&fixed_name])?;
                 if modified != 0 {
-                    Ok(Some(fixed_name)) // Return the fixed_name if deleted
+                    Ok(Some(fixed_name))
                 } else {
                     Ok(None)
                 }
