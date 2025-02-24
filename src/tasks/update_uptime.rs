@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::collections::HashMap;
 use std::fmt;
 use std::time::Duration;
@@ -33,25 +34,25 @@ pub async fn uptime_updater(
 			.distinct("uuid", Document::new())
 			.await?
 			.into_iter()
-			.filter_map(|bson_value| bson_value.as_str().map(String::from))
+			.filter_map(|bson_value| bson_value.as_str().map(ToOwned::to_owned))
 			.collect();
 
 		println!("Updating Uptime for {} players", players.len());
-		let mut processed_uuids: Vec<String> = Vec::new();
+		let mut processed_uuids = Vec::with_capacity(players.len());
 
-		let mut no_guild: u16 = 0;
+		let mut no_guild = 0u16;
 		for player in players {
 			if processed_uuids.contains(&player) {
 				continue;
 			}
 
-			match update_uptime(&player, api_key, client).await {
-				| Err(ApiError::NoGuild()) => no_guild += 1,
-				| _ => {},
-			};
+			if let Err(ApiError::NoGuild()) = update_uptime(&player, api_key, client).await {
+				no_guild += 1;
+			}
 
 			processed_uuids.push(player);
 		}
+
 		if no_guild > 0 {
 			println!(
 				"\x1b[34m[INFO] {} players are no longer in a guild\x1b[0m",
@@ -59,7 +60,7 @@ pub async fn uptime_updater(
 			);
 		}
 
-		tokio::time::sleep(Duration::from_secs(10 * 60)).await; // 10 minutes
+		tokio::time::sleep(Duration::from_secs(10 * 60)).await;
 	}
 }
 
@@ -100,24 +101,27 @@ struct GuildResponse {
 	guild: Option<Guild>,
 }
 
-#[derive(Clone, Deserialize)]
+#[derive(Deserialize)]
 struct Guild {
 	members: Vec<Member>,
-	_id:     String,
+	#[serde(rename = "_id")]
+	id:      String,
 }
 
-#[derive(Clone, Deserialize)]
+#[derive(Deserialize)]
 #[allow(non_snake_case)]
 struct Member {
 	uuid:       String,
 	expHistory: Option<Value>,
 }
 
+type UptimeHistory = HashMap<String, i64>;
+type GuildUptimeData = HashMap<String, UptimeHistory>;
+
 async fn get_guild_uptime_data(
 	api_key: &str,
-	uuid: &String,
-) -> Result<(String, HashMap<String, HashMap<String, i64>>), Box<dyn std::error::Error + Send + Sync>>
-{
+	uuid: &str,
+) -> Result<(String, GuildUptimeData), Box<dyn std::error::Error + Send + Sync>> {
 	let url = format!("https://api.hypixel.net/v2/guild?key={api_key}&player={uuid}");
 
 	let response = reqwest::get(&url).await?;
@@ -125,35 +129,38 @@ async fn get_guild_uptime_data(
 	let guild_response: GuildResponse = serde_json::from_str(&response_text)?;
 
 	let guild = guild_response.guild.ok_or_else(|| ApiError::NoGuild())?;
-
-	let mut guild_uptime_data = HashMap::new();
+	let mut guild_uptime_data = HashMap::with_capacity(guild.members.len());
 
 	for member in guild.members {
-		let mut uptime_history = HashMap::new();
+		if let Some(exp_history) = member.expHistory {
+			let uptime_history: UptimeHistory = exp_history
+				.as_object()
+				.map(|history| {
+					history
+						.iter()
+						.filter_map(|(date, xp)| {
+							xp.as_i64().map(|xp_value| (date.to_owned(), xp_value))
+						})
+						.collect()
+				})
+				.unwrap_or_default();
 
-		if let Some(ref exp_history) = member.expHistory {
-			for (date, xp) in exp_history.as_object().unwrap() {
-				let xp_value = xp.as_i64().unwrap();
-				uptime_history.insert(date.to_string(), xp_value);
+			if !uptime_history.is_empty() {
+				guild_uptime_data.insert(member.uuid, uptime_history);
 			}
 		}
-		guild_uptime_data.insert(member.uuid, uptime_history);
 	}
 
-	Ok((guild._id, guild_uptime_data))
+	Ok((guild.id, guild_uptime_data))
 }
 
 pub async fn update_uptime(
-	uuid: &String,
+	uuid: &str,
 	api_key: &str,
 	client: &Client,
 ) -> Result<(), ApiError> {
-	let (guild_id, member_uptime_history) = match get_guild_uptime_data(api_key, uuid).await {
-		| Ok(result) => result,
-		| Err(e) => return Err(e.into()),
-	};
+	let (guild_id, member_uptime_history) = get_guild_uptime_data(api_key, uuid).await?;
 
-	let mut models = Vec::new();
 	let collection: Collection<Uptime> = client.database("Players").collection("Uptime");
 	let index_model = IndexModel::builder()
 		.keys(doc! { "uuid": 1, "date": 1 })
@@ -161,36 +168,41 @@ pub async fn update_uptime(
 		.build();
 	collection.create_index(index_model).await?;
 
-	for (uuid, uptime_history) in member_uptime_history {
-		for (unformatted_date, new_gexp) in uptime_history {
-			let formatted_date = format!("{} 00:00:00", unformatted_date);
-			let naive_date = NaiveDateTime::parse_from_str(&formatted_date, "%Y-%m-%d %H:%M:%S")
-				.expect("Failed to parse date");
-			let date = BsonDateTime::from_chrono(Utc.from_utc_datetime(&naive_date));
+	let models: Vec<_> = member_uptime_history
+		.into_iter()
+		.flat_map(|(uuid, uptime_history)| {
+			let guild_id = Cow::Borrowed(&guild_id);
+			uptime_history.into_iter().map({
+				let value = collection.clone();
+				move |(unformatted_date, new_gexp)| {
+					let date = format!("{} 00:00:00", unformatted_date);
+					let naive_date = NaiveDateTime::parse_from_str(&date, "%Y-%m-%d %H:%M:%S")
+						.expect("Failed to parse date");
+					let bson_date = BsonDateTime::from_chrono(Utc.from_utc_datetime(&naive_date));
 
-			let filter = doc! {
-				"uuid": &uuid,
-				"date": &date,
-			};
+					let filter = doc! {
+						"uuid": &uuid,
+						"date": &bson_date,
+					};
 
-			let update = doc! {
-				"_id": ObjectId::new(),
-				"uuid": &uuid,
-				"gexp": new_gexp,
-				"date": date,
-				"guild_id": &guild_id,
-			};
+					let update = doc! {
+						"_id": ObjectId::new(),
+						"uuid": &uuid,
+						"gexp": new_gexp,
+						"date": bson_date,
+						"guild_id": guild_id.as_ref(),
+					};
 
-			let model = ReplaceOneModel::builder()
-				.namespace(collection.namespace())
-				.filter(filter)
-				.replacement(update)
-				.upsert(true)
-				.build();
-
-			models.push(model);
-		}
-	}
+					ReplaceOneModel::builder()
+						.namespace(value.namespace())
+						.filter(filter)
+						.replacement(update)
+						.upsert(true)
+						.build()
+				}
+			})
+		})
+		.collect();
 
 	if !models.is_empty() {
 		client.bulk_write(models).await?;

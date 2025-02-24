@@ -20,8 +20,8 @@ pub async fn tag(
     if let Ok(Some((_name, content))) = data.tag_db.get_tag(&name, id).await {
         let mut message = CreateMessage::default().content(content);
         
-        if let Some(msg_id) = referenced_message {
-            message = message.reference_message(msg_id);
+        if let Some(msg_ref) = referenced_message {
+            message = message.reference_message(msg_ref);
         }
         
         ctx.channel_id()
@@ -30,7 +30,7 @@ pub async fn tag(
     } else {
         ctx.send(
             CreateReply::default()
-                .embed(create_error_embed(&format!("❌ Tag `{}` does not exist", name)))
+                .embed(create_error_embed(&format!("❌ Tag `{}` does not exist", name.replace("`", "\\`"))))
         ).await?;
     }
 
@@ -53,6 +53,7 @@ async fn create(
             ctx.send(CreateReply::default().content(format!("✅ Created tag `{}`", name)))
                 .await?
         }
+        // todo catch error that tag already exists
         Err(e) => {
             ctx.send(CreateReply::default().embed(create_error_embed(&e.to_string()))).await?
         }
@@ -73,7 +74,7 @@ async fn delete(
             ctx.send(CreateReply::default().content(format!("✅ Deleted tag `{}`", fixed_name))).await?
         }
         Ok(None) => {
-            ctx.send(CreateReply::default().embed(create_error_embed(&format!("❌ Tag `{}` does not exist", name))))
+            ctx.send(CreateReply::default().embed(create_error_embed(&format!("❌ Tag `{}` does not exist", name.replace("`", "\\`")))))
                 .await?
         }
         Err(e) => {
@@ -100,7 +101,7 @@ async fn edit(
         }
         Ok(None) => {
             ctx.send(
-                CreateReply::default().embed(create_error_embed(&format!("❌ Tag `{}` does not exist", name))),
+                CreateReply::default().embed(create_error_embed(&format!("❌ Tag `{}` does not exist", name.replace("`", "\\`")))),
             )
             .await?
         }
@@ -132,12 +133,13 @@ async fn list(
                 CreateEmbed::default()
                     .title("All Tags")
                     .description(formatted_tags)
-                    .color(color),
-            ))
+                    .color(color)
+            ).ephemeral(true))
             .await?
         }
+        // TODO: catch error if table doesnt exist
         Err(e) => {
-            ctx.send(CreateReply::default().embed(create_error_embed(&e.to_string()))).await?
+            ctx.send(CreateReply::default().embed(create_error_embed(&e.to_string())).ephemeral(true)).await?
         }
     };
     Ok(())
@@ -155,7 +157,7 @@ async fn preview(
         ctx.send(CreateReply::default().content(content).ephemeral(true)).await?;
     } else {
         ctx.send(
-            CreateReply::default().embed(create_error_embed(&format!("❌ Tag `{}` does not exist", name))).ephemeral(true)
+            CreateReply::default().embed(create_error_embed(&format!("❌ Tag `{}` does not exist", name.replace("`", "\\`")))).ephemeral(true)
         ).await?;
     }
     Ok(())
@@ -181,9 +183,7 @@ async fn raw(
             .replace("|", "\\|");
         ctx.send(CreateReply::default().content(content)).await?;
     } else {
-   
-        let escaped_name = name.replace("`", "\\`");
-        ctx.send(CreateReply::default().embed(create_error_embed(&format!("❌ Tag `{}` does not exist", escaped_name))))
+        ctx.send(CreateReply::default().embed(create_error_embed(&format!("❌ Tag `{}` does not exist", name.replace("`", "\\`")))))
             .await?;
     }
 
