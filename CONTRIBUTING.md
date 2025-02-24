@@ -10,6 +10,7 @@
 - Hypixel api key
 
 ### Setting Up
+- Clone the repository `git clone https://github.com/Not-a-cowfr/Cow-bot.git`
 - Fill out required environment variables
     - Create a copy of [.env.example](.env.example) and rename it to `.env`
     - Get your hypixel api key from the [developer dashboard](https://developer.hypixel.net/)
