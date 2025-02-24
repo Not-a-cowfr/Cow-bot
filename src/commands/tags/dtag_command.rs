@@ -30,7 +30,7 @@ pub async fn dtag(
     } else {
         ctx.send(
             CreateReply::default()
-                .embed(create_error_embed(&format!("Tag `{}` does not exist", name)))
+                .embed(create_error_embed(&format!("❌ Tag `{}` does not exist", name)))
         ).await?;
     }
     if let Some(msg) = msg {

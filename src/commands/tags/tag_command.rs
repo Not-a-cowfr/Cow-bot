@@ -30,7 +30,7 @@ pub async fn tag(
     } else {
         ctx.send(
             CreateReply::default()
-                .embed(create_error_embed(&format!("Tag `{}` does not exist", name)))
+                .embed(create_error_embed(&format!("❌ Tag `{}` does not exist", name)))
         ).await?;
     }
 
@@ -50,7 +50,7 @@ async fn create(
 
     match data.tag_db.create_tag(&name, &content, id).await {
         Ok(_) => {
-            ctx.send(CreateReply::default().content(format!("Created tag `{}`", name)))
+            ctx.send(CreateReply::default().content(format!("✅ Created tag `{}`", name)))
                 .await?
         }
         Err(e) => {
@@ -70,10 +70,10 @@ async fn delete(
 
     match data.tag_db.delete_tag(&name, id).await {
         Ok(Some(fixed_name)) => {
-            ctx.send(CreateReply::default().content(format!("Deleted tag `{}`", fixed_name))).await?
+            ctx.send(CreateReply::default().content(format!("✅ Deleted tag `{}`", fixed_name))).await?
         }
         Ok(None) => {
-            ctx.send(CreateReply::default().embed(create_error_embed(&format!("Tag `{}` does not exist", name))))
+            ctx.send(CreateReply::default().embed(create_error_embed(&format!("❌ Tag `{}` does not exist", name))))
                 .await?
         }
         Err(e) => {
@@ -96,11 +96,11 @@ async fn edit(
 
     match data.tag_db.edit_tag(&name, &content, id).await {
         Ok(Some(fixed_name)) => {
-            ctx.send(CreateReply::default().content(format!("Updated tag `{}`", fixed_name))).await?
+            ctx.send(CreateReply::default().content(format!("✅ Updated tag `{}`", fixed_name))).await?
         }
         Ok(None) => {
             ctx.send(
-                CreateReply::default().embed(create_error_embed(&format!("Tag `{}` does not exist", name))),
+                CreateReply::default().embed(create_error_embed(&format!("❌ Tag `{}` does not exist", name))),
             )
             .await?
         }
@@ -155,7 +155,7 @@ async fn preview(
         ctx.send(CreateReply::default().content(content).ephemeral(true)).await?;
     } else {
         ctx.send(
-            CreateReply::default().embed(create_error_embed(&format!("Tag `{}` does not exist", name))).ephemeral(true)
+            CreateReply::default().embed(create_error_embed(&format!("❌ Tag `{}` does not exist", name))).ephemeral(true)
         ).await?;
     }
     Ok(())
@@ -169,20 +169,21 @@ async fn raw(
 ) -> Result<(), Error> {
     let (data, id) = get_data_and_id(ctx).await?;
 
-    if let Ok(Some((_name, content))) = data.tag_db.get_tag(&name, id).await {
-        let escaped_content = content
+    if let Ok(Some((_name, mut content))) = data.tag_db.get_tag(&name, id).await {
+        content = content
             .replace("`", "\\`")
             .replace("*", "\\*")
             .replace("_", "\\_")
             .replace("~", "\\~")
             .replace("#", "\\#")
+            .replace("<", "\\<")
             .replace(">", "\\>")
             .replace("|", "\\|");
-        ctx.send(CreateReply::default().content(escaped_content)).await?;
+        ctx.send(CreateReply::default().content(content)).await?;
     } else {
    
         let escaped_name = name.replace("`", "\\`");
-        ctx.send(CreateReply::default().embed(create_error_embed(&format!("Tag `{}` does not exist", escaped_name))))
+        ctx.send(CreateReply::default().embed(create_error_embed(&format!("❌ Tag `{}` does not exist", escaped_name))))
             .await?;
     }
 
@@ -201,7 +202,7 @@ async fn alias(
     if let Ok(Some((_name, content))) = data.tag_db.get_tag(&name, id).await {
         match data.tag_db.create_tag(&alias, &content, id).await {
             Ok(_) => {
-                ctx.send(CreateReply::default().content(format!("Created tag alias `{}`", alias)))
+                ctx.send(CreateReply::default().content(format!("✅ Created tag alias `{}`", alias)))
                     .await?
             }
             Err(e) => {
@@ -209,7 +210,7 @@ async fn alias(
             }
         };
     } else {
-        ctx.send(CreateReply::default().embed(create_error_embed(&format!("Tag `{}` does not exist", name))))
+        ctx.send(CreateReply::default().embed(create_error_embed(&format!("❌ Tag `{}` does not exist", name))))
             .await?;
     }
     Ok(())
