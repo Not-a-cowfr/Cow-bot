@@ -24,10 +24,12 @@
 ```rust
 use crate::{Context, Error};
 
+/// slash command descriptions are made like this with 3 /
 #[poise::command(slash_command)]
 pub async fn color(
 	ctx: Context<'_>,
 ) -> Result<(), Error> {
+    // do whatever you want, I recommend checking out the poise and serenity docs
     Ok(())
 }
 ```
