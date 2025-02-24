@@ -147,7 +147,6 @@ impl TagDb {
         guild_id: u64,
     ) -> Result<Option<(String, String)>, Box<dyn std::error::Error + Send + Sync>> {
         if let Some((fixed_name, content)) = fix_typos(name, guild_id).await? {
-            println!("name: {}", fixed_name);
             return Ok(Some((fixed_name, content)));
         }
         Ok(None)
