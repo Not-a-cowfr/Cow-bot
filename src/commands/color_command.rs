@@ -2,9 +2,8 @@ use poise::{CreateReply, serenity_prelude as serenity};
 use rusqlite::{Connection, params};
 use serenity::all::CreateEmbed;
 
-use crate::{Context, Error};
-
 use super::utils::create_error_embed;
+use crate::{Context, Error};
 
 #[poise::command(slash_command, prefix_command, invoke_on_edit, reuse_response)]
 pub async fn color(
@@ -18,7 +17,8 @@ pub async fn color(
 	let color = color.replace("#", "");
 
 	if !color.chars().all(|c| c.is_digit(16)) || color.len() != 6 {
-		let embed = create_error_embed("Invalid hex code. Please provide a valid 6-character hex code.");
+		let embed =
+			create_error_embed("Invalid hex code. Please provide a valid 6-character hex code.");
 		ctx.send(CreateReply::default().embed(embed)).await?;
 		return Ok(());
 	}

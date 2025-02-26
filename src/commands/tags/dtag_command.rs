@@ -1,5 +1,6 @@
 use poise::CreateReply;
 use serenity::all::CreateMessage;
+use tokio::time::Instant;
 
 use crate::{commands::{tags::tag_utils::get_data_and_id, utils::create_error_embed}, Context, Error};
 
@@ -8,6 +9,7 @@ pub async fn dtag(
     ctx: Context<'_>,
     #[description = "Tag name"] name: String,
 ) -> Result<(), Error> {
+    let start = Instant::now();
     let msg = match &ctx {
         Context::Prefix(prefix_ctx) => Some(prefix_ctx.msg),
         _ => None,
@@ -36,5 +38,6 @@ pub async fn dtag(
     if let Some(msg) = msg {
         msg.delete(ctx.serenity_context()).await?;
     }
+    println!("dtag took {} ms", start.elapsed().as_millis());
     Ok(())
 }
