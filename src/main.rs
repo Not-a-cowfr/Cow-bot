@@ -254,14 +254,11 @@ async fn main() {
 		.options(options)
 		.build();
 
+	let client = MONGO_CLIENT.get().unwrap();
 	tokio::task::spawn_blocking(move || {
 		if let Err(err) = tokio::runtime::Handle::current().block_on(uptime_updater(
 			&API_KEY.get().unwrap(),
-			MONGO_CLIENT
-				.get()
-				.unwrap()
-				.database("Players")
-				.collection("Uptime"),
+			client.database("Players").collection("Uptime"),
 		)) {
 			eprintln!(
 				"\x1b[31;1m[ERROR] Error in uptime tracker:\x1b[0m\n\n{:?}",

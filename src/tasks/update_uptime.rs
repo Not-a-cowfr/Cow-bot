@@ -28,7 +28,7 @@ pub async fn uptime_updater(
 	collection: Collection<Uptime>,
 ) -> Result<(), ApiError> {
 	loop {
-		let client = MONGO_CLIENT.get().unwrap();
+		let client = &MONGO_CLIENT.get().unwrap();
 
 		let players: Vec<String> = collection
 			.distinct("uuid", Document::new())

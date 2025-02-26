@@ -21,12 +21,16 @@ pub async fn uptime(
 	#[description = "Time window, eg 7 for 7 days"] window: Option<i64>,
 ) -> Result<(), Error> {
 	let start = Instant::now();
-	ctx.defer().await?;
 
-	let user_id = user.unwrap_or_else(|| ctx.author().id.to_string());
-	let (username, uuid) = match get_account_from_anything(&user_id).await {
+	let (defer, account) = tokio::join!(ctx.defer(), async {
+		let user_id = user.unwrap_or_else(|| ctx.author().id.to_string());
+		get_account_from_anything(&user_id).await
+	});
+	defer?;
+
+	let (username, uuid) = match account {
 		| Ok(result) => result,
-		| Err(_e) => {
+		| Err(_) => {
 			let embed = create_error_embed("No linked account found");
 			ctx.send(CreateReply::default().embed(embed)).await?;
 			return Ok(());
@@ -34,11 +38,7 @@ pub async fn uptime(
 	};
 	let time_window = window.unwrap_or(7);
 
-	let client = MONGO_CLIENT
-		.get()
-		.expect("MongoDB client is uninitalized")
-		.clone();
-	let mut uptime_data = match get_uptime(&uuid, time_window, client).await {
+	let mut uptime_data = match get_uptime(&uuid, time_window).await {
 		| Ok(uptime_data) => uptime_data,
 		| Err(e) => {
 			println!("{}", e);
@@ -80,7 +80,6 @@ pub async fn uptime(
 fn get_uptime(
 	uuid: &str,
 	time_window: i64,
-	client: Client,
 ) -> Pin<Box<dyn Future<Output = Result<Vec<(BsonDateTime, i64)>, ApiError>> + Send + '_>> {
 	Box::pin(async move {
 		let date = Utc::now();
@@ -89,6 +88,8 @@ fn get_uptime(
 			"uuid": uuid,
 			"date": { "$gte": start_date }
 		};
+
+		let client: &Client = &MONGO_CLIENT.get().expect("MONGO_CLIENT is uninitialized");
 
 		let mut cursor: Cursor<Uptime> = client
 			.database("Players")
@@ -127,27 +128,35 @@ fn get_uptime(
 }
 
 fn fill_missing_dates(
-	mut results: Vec<(BsonDateTime, i64)>,
+	results: Vec<(BsonDateTime, i64)>,
 	time_window: i64,
 ) -> Vec<(BsonDateTime, i64)> {
-	let now = Utc::now();
-	let start_date = now - Duration::days(time_window);
+	let now = Utc::now().date_naive();
+	let start_date = now - Duration::days(time_window - 1);
 
-	let date_map: HashMap<String, i64> = results
-		.iter()
-		.map(|(date, gexp)| (date.to_chrono().format("%Y-%m-%d").to_string(), *gexp))
+	let date_map: HashMap<_, _> = results
+		.into_iter()
+		.map(|(date, gexp)| (date.to_chrono().date_naive(), gexp))
 		.collect();
 
-	for i in results.len()..time_window as usize {
-		let current_date = start_date + Duration::days(i as i64);
-		let bson_date = BsonDateTime::from_chrono(current_date);
-		let normalized_date = current_date.format("%Y-%m-%d").to_string();
+	let mut filled_results = Vec::with_capacity(time_window as usize);
 
-		let gexp = date_map.get(&normalized_date).copied().unwrap_or(-1);
-		results.push((bson_date, gexp));
+	for days in 0..time_window {
+		let current_date = start_date + Duration::days(days);
+		let datetime_utc = current_date
+			.and_hms_opt(0, 0, 0)
+			.unwrap()
+			.and_local_timezone(Utc)
+			.unwrap();
+		let bson_date = BsonDateTime::from_chrono(datetime_utc);
+
+		let gexp = date_map.get(&current_date).copied().unwrap_or(-1);
+		filled_results.push((bson_date, gexp));
 	}
 
-	results
+	filled_results.sort_by(|a, b| b.0.cmp(&a.0));
+
+	filled_results
 }
 
 fn gexp_to_uptime_as_string(gexp: i64) -> String {
