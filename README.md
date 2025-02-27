@@ -23,10 +23,27 @@ Check out the [Contributing guide](/CONTRIBUTING.md) for more info on how get th
     TODO
 </h2>
 
-- [ ] Add stats command to display the amount of tracked players and guilds
+<h3 align="center">
+    Features
+</h3>
+
+- [ ] Add stats command to display the amount of tracked players and guilds (tag stats? 👀)
 - [ ] Add a command to view the highest uptime of tracked players
-- [ ] Stagger uptime updater to avoid api key limits
+- [ ] Use elite api grapoh endpoint to add collection/skill tracking
+    - [ ] Add a command similar to `/uptime` for this
+    - [ ] Add a command to view the highest collection/skill gain of tracked players
+
+<h3 align="center">
+    Bug fixes
+</h3>
+
 - [ ] Fix uptime using utc time instead of est
+
+<h3 align="center">
+    Improvements
+</h3>
+
+- [ ] Stagger uptime updater to avoid api key limits
 
 <h2 align="center">
 Credits
