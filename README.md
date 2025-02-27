@@ -20,6 +20,15 @@ Contribute
 Check out the [Contributing guide](/CONTRIBUTING.md) for more info on how get things set up
 
 <h2 align="center">
+    TODO
+</h2>
+
+- [ ] Add stats command to display the amount of tracked players and guilds
+- [ ] Add a command to view the highest uptime of tracked players
+- [ ] Stagger uptime updater to avoid api key limits
+- [ ] Fix uptime using utc time instead of est
+
+<h2 align="center">
 Credits
 </h2>
 
