@@ -1,10 +1,10 @@
 on:
   push:
     paths:
-      - '**/*.rs'
-      - '**/*.toml'
-      - '**/*.lock'
-      - '**/*.yml'
+      - "**/*.rs"
+      - "**/*.toml"
+      - "**/*.lock"
+      - "**/*.yml"
 
 jobs:
   rustfmt:
@@ -12,10 +12,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Install nightly
-        run: rustup install nightly
-      - name: Install Rustfmt
-        run: rustup component add rustfmt --toolchain nightly
       - name: Cargo fmt
         run: cargo +nightly fmt --all
 
@@ -25,10 +21,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Install nightly
-        run: rustup install nightly
-      - name: Install Clippy
-        run: rustup component add clippy --toolchain nightly
       - name: Run Clippy
         run: cargo +nightly clippy --workspace --all-targets --message-format=json -- -D warnings | tee clippy.json
 
@@ -37,10 +29,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Install nightly
-        run: rustup install nightly
       - name: Cargo build
         run: cargo +nightly build --workspace --release
+
+  audit:
+    name: Audit
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Cargo audit
+        run: cargo audit
 
   # tests:
   #   name: Tests
