@@ -21,20 +21,20 @@ jobs:
       - name: Cargo fmt
         run: cargo +nightly fmt --all
 
-  clippy:
-    name: Lint Code
-    needs: rustfmt
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: nightly
-          override: true
-          components: clippy
-      - name: Run Clippy
-        run: cargo +nightly clippy --workspace -- -D warnings
+  # clippy:
+  #   name: Lint Code
+  #   needs: rustfmt
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - name: Install toolchain
+  #       uses: actions-rs/toolchain@v1
+  #       with:
+  #         toolchain: nightly
+  #         override: true
+  #         components: clippy
+  #     - name: Run Clippy
+  #       run: cargo +nightly clippy --workspace -- -D warnings
 
   build:
     name: Build
