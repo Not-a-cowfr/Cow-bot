@@ -3,6 +3,7 @@
 
 mod color_command;
 mod get_linked_account_command;
+mod link_command;
 mod uptime_command;
 pub mod tags;
 pub mod utils;
@@ -11,6 +12,7 @@ pub fn get_all_commands() -> Vec<poise::Command<crate::Data, crate::types::Error
     vec![
 		color_command::color(), 
 		get_linked_account_command::get_linked_account(), 
+		link_command::link(), 
 		tags::dtag_command::dtag(), 
 		tags::tag_command::tag(), 
 		uptime_command::uptime()]

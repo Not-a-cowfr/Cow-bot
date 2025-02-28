@@ -6,8 +6,9 @@ pub fn create_users_table() -> Result<()> {
 		"CREATE TABLE IF NOT EXISTS users (
 			id INTEGER PRIMARY KEY,
 			username TEXT NOT NULL,
-			userid TEXT NOT NULL,
-			color TEXT NOT NULL
+			mc_username TEXT,
+			mc_uuid TEXT,
+			color TEXT
 			)",
 		[],
 	)?;

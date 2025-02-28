@@ -1,6 +1,6 @@
 use poise::{CreateReply, serenity_prelude as serenity};
 use rusqlite::{Connection, params};
-use serenity::all::CreateEmbed;
+use serenity::builder::CreateEmbed;
 
 use super::utils::create_error_embed;
 use crate::{Context, Error};
@@ -26,21 +26,20 @@ pub async fn color(
 	let color_value = u32::from_str_radix(&color, 16).unwrap();
 	let color_but_with_thingy = format!("0x{}", color);
 
-	let user_exists;
 	{
 		let conn = Connection::open("src/data/users.db")?;
-		let mut stmt = conn.prepare("SELECT COUNT(*) FROM users WHERE userid = ?1")?;
+		let mut stmt = conn.prepare("SELECT COUNT(*) FROM users WHERE id = ?1")?;
 		let mut rows = stmt.query(params![user_id])?;
-		user_exists = rows.next()?.unwrap().get::<_, i64>(0)? > 0;
+		let user_exists = rows.next()?.unwrap().get::<_, i64>(0)? > 0;
 
 		if user_exists {
 			conn.execute(
-				"UPDATE users SET color = ?1 WHERE userid = ?2",
+				"UPDATE users SET color = ?1 WHERE id = ?2",
 				params![color_but_with_thingy, user_id],
 			)?;
 		} else {
 			conn.execute(
-				"INSERT INTO users (username, userid, color) VALUES (?1, ?2, ?3)",
+				"INSERT INTO users (username, id, color) VALUES (?1, ?2, ?3)",
 				params![*username, user_id, color_but_with_thingy],
 			)?;
 		}

@@ -34,7 +34,8 @@ struct MojangResponse {
 	name: String,
 }
 
-pub async fn get_account_from_anything(identifier: &str) -> Result<(String, String), Error> {
+#[deprecated = "use get_account_from_anything"]
+pub async fn get_account_from_anything_elite(identifier: &str) -> Result<(String, String), Error> {
 	let clean_identifier = identifier
 		.replace(&['@', '<', '>'][..], "")
 		.trim()
@@ -52,6 +53,42 @@ pub async fn get_account_from_anything(identifier: &str) -> Result<(String, Stri
 	};
 
 	Ok(result)
+}
+
+pub async fn get_account_from_anything(identifier: &str) -> Result<(String, String), Error> {
+	let clean_identifier = identifier
+		.replace(&['@', '<', '>'][..], "")
+		.trim()
+		.to_string();
+
+	let result = if identifier.len() == 32 || identifier.len() <= 16 {
+		get_mojang_info(identifier.to_string()).await?
+	} else if clean_identifier.parse::<u64>().is_ok() {
+		get_linked_account(clean_identifier).await?
+	} else {
+		return Err(Box::new(std::io::Error::new(
+			std::io::ErrorKind::InvalidInput,
+			"Invalid player name or UUID",
+		)));
+	};
+
+	Ok(result)
+}
+
+pub async fn get_linked_account(id: String) -> Result<(String, String), Error> {
+	let conn = Connection::open("src/data/users.db")?;
+
+	let mut stmt = conn.prepare("SELECT mc_username, mc_uuid FROM users WHERE id = ?1")?;
+	let mut rows = stmt.query([id])?;
+
+	if let Some(row) = rows.next()? {
+		Ok((row.get(0)?, row.get(1)?))
+	} else {
+		Err(Box::new(std::io::Error::new(
+			std::io::ErrorKind::InvalidInput,
+			"No linked account found",
+		)))
+	}
 }
 
 pub async fn get_mojang_info(player: String) -> Result<(String, String), Error> {
