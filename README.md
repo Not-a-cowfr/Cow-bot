@@ -12,6 +12,7 @@ Features
 - Get a user's estimated hypixel uptime - `/uptime`
 - Set your own personal custom color for the bot - `/color`
 - Feature rich tag system nearly identitical to that of Fire's without any premium subscription
+- Link your minecraft account for easier (and faster!) responses - `/link`
 
 <h2 align="center">
 Contribute
