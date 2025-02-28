@@ -44,8 +44,6 @@ Check out the [Contributing guide](/CONTRIBUTING.md) for more info on how get th
     Improvements
 </h4>
 
-- [ ] Stagger uptime updater to avoid api key limits
-
 <h2 align="center">
 Credits
 </h2>

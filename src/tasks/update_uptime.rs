@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 use std::collections::HashMap;
+use std::env::var;
 use std::fmt;
 use std::time::Duration;
 
@@ -7,6 +8,7 @@ use bson::oid::ObjectId;
 use bson::{DateTime as BsonDateTime, Document, doc};
 use chrono::{NaiveDateTime, TimeZone, Utc};
 use chrono_tz::America::New_York;
+use dotenv::dotenv;
 use mongodb::options::{IndexOptions, ReplaceOneModel};
 use mongodb::{Client, Collection, IndexModel};
 use serde::{Deserialize, Serialize};
@@ -28,6 +30,17 @@ pub async fn uptime_updater(
 	api_key: &str,
 	collection: Collection<Uptime>,
 ) -> Result<(), ApiError> {
+	dotenv().ok();
+
+	let sleep = var("UPDATE_INTERVAL")
+		.unwrap_or("10".to_string())
+		.parse::<u64>()
+		.unwrap();
+	let key_limit = var("KEY_LIMIT")
+		.unwrap_or("300".to_string())
+		.parse::<u64>()
+		.unwrap();
+
 	loop {
 		let client = &MONGO_CLIENT.get().unwrap();
 
@@ -43,6 +56,9 @@ pub async fn uptime_updater(
 
 		let mut no_guild = 0u16;
 		for player in players {
+			// sleep between updates to avoid rate limiting
+			tokio::time::sleep(Duration::from_secs(sleep / (5 * key_limit / 300))).await;
+
 			if processed_uuids.contains(&player) {
 				continue;
 			}
@@ -61,7 +77,7 @@ pub async fn uptime_updater(
 			);
 		}
 
-		tokio::time::sleep(Duration::from_secs(10 * 60)).await;
+		tokio::time::sleep(Duration::from_secs(sleep * 60)).await;
 	}
 }
 
