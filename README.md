@@ -33,6 +33,7 @@ Check out the [Contributing guide](/CONTRIBUTING.md) for more info on how get th
     - [ ] Add a command similar to `/uptime` for this
     - [ ] Add a command to view the highest collection/skill gain of tracked players
 - [ ] Add total hours and average uptime to `/uptime`
+- [ ] Mkae `/link` command to stop using elite api for linked accounts
 
 <h4 align="center">
     Bug fixes
@@ -43,6 +44,8 @@ Check out the [Contributing guide](/CONTRIBUTING.md) for more info on how get th
 <h4 align="center">
     Improvements
 </h4>
+
+- [ ] Optimize uptime command
 
 <h2 align="center">
 Credits
