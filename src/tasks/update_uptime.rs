@@ -57,7 +57,7 @@ pub async fn uptime_updater(
 		let mut no_guild = 0u16;
 		for player in players {
 			// sleep between updates to avoid rate limiting
-			tokio::time::sleep(Duration::from_secs(sleep / (5 * key_limit / 300))).await;
+			tokio::time::sleep(Duration::from_secs(sleep / (4 * key_limit / 300))).await;
 
 			if processed_uuids.contains(&player) {
 				continue;
