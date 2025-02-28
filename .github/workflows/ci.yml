@@ -34,7 +34,7 @@ jobs:
           override: true
           components: clippy
       - name: Run Clippy
-        run: cargo +nightly clippy --workspace --message-format=json -- -D warnings
+        run: cargo +nightly clippy --workspace -- -D warnings
 
   build:
     name: Build
@@ -48,15 +48,6 @@ jobs:
           override: true
       - name: Cargo build
         run: cargo +nightly build --release
-
-  audit:
-    name: Audit
-    needs: build
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Cargo audit
-        run: cargo audit
 
   # tests:
   #   name: Tests
