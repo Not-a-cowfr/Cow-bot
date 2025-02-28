@@ -8,10 +8,10 @@ Discord bot made for different miscellaneous skyblock utilities
 Features
 </h2>
 
-- Get a user's mojang info - `/get_linked_account`
+- Get a user's mojang info and some quick links - `/get_linked_account`
 - Get a user's estimated hypixel uptime - `/uptime`
-- Set your custom color for the bot - `/color`
-- Feature rich tag system nearly identitical to that of Fire's
+- Set your own personal custom color for the bot - `/color`
+- Feature rich tag system nearly identitical to that of Fire's without any premium subscription
 
 <h2 align="center">
 Contribute
@@ -29,11 +29,12 @@ Check out the [Contributing guide](/CONTRIBUTING.md) for more info on how get th
 
 - [ ] Add stats command to display the amount of tracked players and guilds (tag stats? 👀)
 - [ ] Add a command to view the highest uptime of tracked players
-- [ ] Use elite api grapoh endpoint to add collection/skill tracking
+- [ ] Use elite api graph endpoint to add collection/skill tracking
     - [ ] Add a command similar to `/uptime` for this
     - [ ] Add a command to view the highest collection/skill gain of tracked players
 - [ ] Add total hours and average uptime to `/uptime`
-- [ ] Mkae `/link` command to stop using elite api for linked accounts
+- [ ] Add graph to `/uptime`
+- [ ] Make `/link` command to stop using elite api for linked accounts
 
 <h4 align="center">
     Bug fixes
