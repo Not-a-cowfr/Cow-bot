@@ -1,6 +1,7 @@
 use std::fmt;
 
 use poise::CreateReply;
+use rayon::prelude::*;
 use strsim::jaro_winkler;
 use tokio::task;
 
@@ -227,7 +228,7 @@ async fn fix_typos(
 		return Ok(None);
 	}
 
-	let best_match = all_tags.iter().max_by(|a, b| {
+	let best_match = all_tags.par_iter().max_by(|a, b| {
 		jaro_winkler(name, a)
 			.partial_cmp(&jaro_winkler(name, b))
 			.unwrap_or(std::cmp::Ordering::Equal)

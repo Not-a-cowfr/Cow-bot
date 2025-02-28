@@ -6,6 +6,7 @@ use std::time::Duration;
 use bson::oid::ObjectId;
 use bson::{DateTime as BsonDateTime, Document, doc};
 use chrono::{NaiveDateTime, TimeZone, Utc};
+use chrono_tz::America::New_York;
 use mongodb::options::{IndexOptions, ReplaceOneModel};
 use mongodb::{Client, Collection, IndexModel};
 use serde::{Deserialize, Serialize};
@@ -80,7 +81,7 @@ impl fmt::Display for ApiError {
 	) -> fmt::Result {
 		match self {
 			| ApiError::Database(e) => write!(f, "Database error: {}", e),
-			| ApiError::Api(msg) => write!(f, "API error: {}", msg),
+			| ApiError::Api(msg) => write!(f, "{}", msg),
 			| ApiError::NoGuild() => write!(f, "Player is not in a guild"),
 		}
 	}
@@ -91,14 +92,17 @@ impl From<mongodb::error::Error> for ApiError {
 }
 
 impl From<Box<dyn std::error::Error + Send + Sync>> for ApiError {
-	fn from(err: Box<dyn std::error::Error + Send + Sync>) -> ApiError {
-		ApiError::Api(err.to_string())
+	fn from(e: Box<dyn std::error::Error + Send + Sync>) -> ApiError {
+		ApiError::Api(e.to_string())
 	}
 }
 
 #[derive(Deserialize)]
 struct GuildResponse {
-	guild: Option<Guild>,
+	success: bool,
+	guild:   Option<Guild>,
+	#[serde(default)]
+	cause:   Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -127,6 +131,12 @@ async fn get_guild_uptime_data(
 	let response = reqwest::get(&url).await?;
 	let response_text = response.text().await?;
 	let guild_response: GuildResponse = serde_json::from_str(&response_text)?;
+
+	if !guild_response.success {
+		if let Some(e) = &guild_response.cause {
+			return Err(Box::new(ApiError::Api(e.clone())));
+		}
+	}
 
 	let guild = guild_response.guild.ok_or_else(|| ApiError::NoGuild())?;
 	let mut guild_uptime_data = HashMap::with_capacity(guild.members.len());
@@ -178,7 +188,8 @@ pub async fn update_uptime(
 					let date = format!("{} 00:00:00", unformatted_date);
 					let naive_date = NaiveDateTime::parse_from_str(&date, "%Y-%m-%d %H:%M:%S")
 						.expect("Failed to parse date");
-					let bson_date = BsonDateTime::from_chrono(Utc.from_utc_datetime(&naive_date));
+					let est_date = New_York.from_local_datetime(&naive_date).unwrap();
+					let bson_date = BsonDateTime::from_chrono(est_date.with_timezone(&Utc));
 
 					let filter = doc! {
 						"uuid": &uuid,
@@ -186,7 +197,6 @@ pub async fn update_uptime(
 					};
 
 					let update = doc! {
-						"_id": ObjectId::new(),
 						"uuid": &uuid,
 						"gexp": new_gexp,
 						"date": bson_date,

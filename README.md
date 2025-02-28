@@ -37,7 +37,7 @@ Check out the [Contributing guide](/CONTRIBUTING.md) for more info on how get th
     Bug fixes
 </h3>
 
-- [ ] Fix uptime using utc time instead of est
+- [ ] Fix uptime having duplicated dates
 
 <h3 align="center">
     Improvements

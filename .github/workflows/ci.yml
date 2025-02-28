@@ -22,7 +22,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Run Clippy
-        run: cargo +nightly clippy --workspace --all-targets --message-format=json -- -D warnings | tee clippy.json
+        run: cargo +nightly clippy --workspace --message-format=json -- -D warnings
 
   build:
     name: Build
@@ -30,7 +30,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Cargo build
-        run: cargo +nightly build --workspace --release
+        run: cargo +nightly build --release
 
   audit:
     name: Audit

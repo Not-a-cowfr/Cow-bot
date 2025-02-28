@@ -2,7 +2,8 @@ use std::collections::HashMap;
 use std::pin::Pin;
 
 use bson::DateTime as BsonDateTime;
-use chrono::{Duration, Utc};
+use chrono::{Duration, TimeZone, Utc};
+use chrono_tz::America::New_York;
 use futures::stream::StreamExt;
 use mongodb::bson::doc;
 use mongodb::{Client, Cursor};
@@ -36,7 +37,13 @@ pub async fn uptime(
 			return Ok(());
 		},
 	};
-	let time_window = window.unwrap_or(7);
+	let time_window: i64 = window.unwrap_or(7);
+
+	if time_window < 1 {
+		let embed = create_error_embed("Time window must be at least 1 day");
+		ctx.send(CreateReply::default().embed(embed)).await?;
+		return Ok(());
+	}
 
 	let mut uptime_data = match get_uptime(&uuid, time_window).await {
 		| Ok(uptime_data) => uptime_data,
@@ -82,7 +89,7 @@ fn get_uptime(
 	time_window: i64,
 ) -> Pin<Box<dyn Future<Output = Result<Vec<(BsonDateTime, i64)>, ApiError>> + Send + '_>> {
 	Box::pin(async move {
-		let date = Utc::now();
+		let date = New_York.from_utc_datetime(&Utc::now().naive_utc());
 		let start_date = BsonDateTime::from_chrono(date - Duration::days(time_window));
 		let filter = doc! {
 			"uuid": uuid,
@@ -131,24 +138,31 @@ fn fill_missing_dates(
 	results: Vec<(BsonDateTime, i64)>,
 	time_window: i64,
 ) -> Vec<(BsonDateTime, i64)> {
-	let now = Utc::now().date_naive();
+	let now = New_York
+		.from_utc_datetime(&Utc::now().naive_utc())
+		.date_naive();
 	let start_date = now - Duration::days(time_window - 1);
 
 	let date_map: HashMap<_, _> = results
 		.into_iter()
-		.map(|(date, gexp)| (date.to_chrono().date_naive(), gexp))
+		.map(|(date, gexp)| {
+			let est_date = New_York
+				.from_utc_datetime(&date.to_chrono().naive_utc())
+				.date_naive();
+			(est_date, gexp)
+		})
 		.collect();
 
 	let mut filled_results = Vec::with_capacity(time_window as usize);
 
 	for days in 0..time_window {
 		let current_date = start_date + Duration::days(days);
-		let datetime_utc = current_date
-			.and_hms_opt(0, 0, 0)
+		let datetime_est = current_date.and_hms_opt(0, 0, 0).unwrap();
+		let datetime_utc = New_York
+			.from_local_datetime(&datetime_est)
 			.unwrap()
-			.and_local_timezone(Utc)
-			.unwrap();
-		let bson_date = BsonDateTime::from_chrono(datetime_utc);
+			.naive_utc();
+		let bson_date = BsonDateTime::from_chrono(Utc.from_utc_datetime(&datetime_utc));
 
 		let gexp = date_map.get(&current_date).copied().unwrap_or(-1);
 		filled_results.push((bson_date, gexp));
