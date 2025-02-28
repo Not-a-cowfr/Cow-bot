@@ -3,6 +3,7 @@ use serde::Deserialize;
 use serenity::all::CreateEmbed;
 
 use crate::ERROR_COLOR;
+use crate::tasks::update_uptime::ApiError;
 use crate::types::Error;
 
 fn get_color_backend(username: &str) -> Result<Option<String>> {
@@ -19,13 +20,14 @@ fn get_color_backend(username: &str) -> Result<Option<String>> {
 }
 
 pub fn get_color(username: &str) -> u32 {
+	// TODO: combine these 2 functions into 1
 	let color_result = get_color_backend(username);
 
 	color_result
 		.ok()
 		.flatten()
 		.and_then(|color_str| u32::from_str_radix(color_str.trim_start_matches("0x"), 16).ok())
-		.unwrap_or(0x383838) // default color if there's an error or no color found
+		.unwrap_or(0x2b2d31) // color of discord embed with default discord dark theme
 }
 
 #[derive(Deserialize)]
@@ -146,6 +148,102 @@ pub async fn get_linked_elite_account(discord_id: String) -> Result<(String, Str
 
 	let account: MojangResponse = serde_json::from_str(&body)?;
 	Ok((account.name, account.id))
+}
+
+#[derive(Deserialize, Debug)]
+struct PlayerResponse {
+	success: bool,
+	player:  Option<Player>,
+	#[serde(default)]
+	cause:   Option<String>,
+}
+
+#[derive(Deserialize, Debug)]
+#[allow(non_snake_case)]
+struct Player {
+	socialMedia: Option<SocialMedia>,
+}
+
+#[derive(Deserialize, Debug)]
+struct SocialMedia {
+	links: Links,
+}
+
+#[derive(Deserialize, Debug)]
+#[allow(non_snake_case, dead_code)]
+pub struct Links {
+	TWITTER:   Option<String>,
+	YOUTUBE:   Option<String>,
+	INSTAGRAM: Option<String>,
+	TWITCH:    Option<String>,
+	DISCORD:   Option<String>,
+	FORUMS:    Option<String>,
+}
+
+pub async fn get_hypixel_linked_socials(uuid: String) -> Result<Links, Error> {
+	let api_key = std::env::var("API_KEY")?;
+	let url = format!(
+		"https://api.hypixel.net/v2/player?key={}&uuid={}",
+		api_key, uuid
+	);
+
+	let response = reqwest::get(&url).await?;
+	let player_data: PlayerResponse = response.json().await?;
+
+	if !player_data.success {
+		if let Some(e) = &player_data.cause {
+			return Err(Box::new(ApiError::Api(e.clone())));
+		}
+	}
+
+	if !player_data.success {
+		return Err(Box::new(std::io::Error::new(
+			std::io::ErrorKind::Other,
+			player_data
+				.cause
+				.unwrap_or_else(|| "Unknown error".to_string()),
+		)));
+	}
+
+	match player_data.player {
+		| Some(player) => match player.socialMedia {
+			| Some(social_media) => Ok(social_media.links),
+			| None => Ok(Links {
+				TWITTER:   None,
+				YOUTUBE:   None,
+				INSTAGRAM: None,
+				TWITCH:    None,
+				DISCORD:   None,
+				FORUMS:    None,
+			}),
+		},
+		| None => Ok(Links {
+			TWITTER:   None,
+			YOUTUBE:   None,
+			INSTAGRAM: None,
+			TWITCH:    None,
+			DISCORD:   None,
+			FORUMS:    None,
+		}),
+	}
+}
+
+pub async fn is_hypixel_linked_account(
+	uuid: String,
+	discord_user: String,
+) -> Result<bool, Error> {
+	let linked_socials = get_hypixel_linked_socials(uuid).await?;
+
+	if linked_socials.DISCORD.is_none() {
+		return Err(Box::new(std::io::Error::new(
+			std::io::ErrorKind::NotFound,
+			"Please link your discord on Hypixel".to_string(),
+		)));
+	}
+
+	Ok(linked_socials
+		.DISCORD
+		.map_or(false, |discord| discord == discord_user))
 }
 
 pub fn create_error_embed(description: &str) -> CreateEmbed {

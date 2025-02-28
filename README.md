@@ -46,6 +46,8 @@ Check out the [Contributing guide](/CONTRIBUTING.md) for more info on how get th
 </h4>
 
 - [ ] Optimize uptime command
+- [ ] Extract common error structs and abstract them into main.rs, thne use that to improve errro handling
+- [ ] Various TODO comments spread all over
 
 <h2 align="center">
 Credits
