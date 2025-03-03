@@ -15,14 +15,13 @@ use crate::{Context, Error};
 #[poise::command(slash_command, prefix_command)]
 pub async fn link(
 	ctx: Context<'_>,
-	#[description = "username/uuid"] name: Option<String>,
+	#[description = "username/uuid"] name: String,
 ) -> Result<(), Error> {
 	let user = &ctx.author().name;
 	let user_id = &ctx.author().id.to_string();
-	let identifier = name.unwrap_or_else(|| user_id.clone());
 
 	#[allow(deprecated)]
-	match get_account_from_anything_elite(&identifier).await {
+	match get_account_from_anything_elite(&name).await {
 		| Ok((username, uuid)) => {
 			match is_hypixel_linked_account(uuid.clone(), user.clone()).await {
 				| Err(e) => {

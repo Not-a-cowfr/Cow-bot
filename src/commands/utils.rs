@@ -46,7 +46,10 @@ pub async fn get_account_from_anything_elite(identifier: &str) -> Result<(String
 	let result = if identifier.len() == 32 || identifier.len() <= 16 {
 		get_mojang_info(identifier.to_string()).await?
 	} else if clean_identifier.parse::<u64>().is_ok() {
-		get_linked_elite_account(clean_identifier).await?
+		match get_account_from_anything(&clean_identifier).await {
+			| Ok(result) => return Ok(result),
+			| Err(_) => get_linked_elite_account(clean_identifier).await?,
+		}
 	} else {
 		return Err(Box::new(std::io::Error::new(
 			std::io::ErrorKind::InvalidInput,

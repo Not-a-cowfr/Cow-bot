@@ -1,7 +1,8 @@
 use poise::CreateReply;
 use serenity::all::{CreateEmbed, User};
 
-use crate::commands::utils::{create_error_embed, get_account_from_anything, get_color};
+#[allow(deprecated)]
+use crate::commands::utils::{create_error_embed, get_account_from_anything_elite, get_color};
 use crate::{Context, Error};
 
 #[poise::command(context_menu_command = "Get Linked Account", ephemeral = true)]
@@ -9,7 +10,8 @@ pub async fn get_linked_account(
 	ctx: Context<'_>,
 	#[description = "Discord profile to get linked account of"] user: User,
 ) -> Result<(), Error> {
-	let (username, uuid) = match get_account_from_anything(&user.id.to_string()).await {
+	#[allow(deprecated)]
+	let (username, uuid) = match get_account_from_anything_elite(&user.id.to_string()).await {
 		| Ok(result) => result,
 		| Err(_e) => {
 			let embed = create_error_embed("No linked account found");
