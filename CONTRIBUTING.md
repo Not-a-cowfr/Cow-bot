@@ -1,9 +1,12 @@
 ### Prerequisites
 - Git
 - Rust
+
+-# (note that this was devloped on windows so you're more on your own if on mac or linux)
 - [msvc build tools](https://visualstudio.microsoft.com/downloads/?q=build+tools)
     - You can also use this [gist](https://gist.github.com/mmozeiko/7f3162ec2988e81e56d5c4e22cde9977) if you just need
       the build tools for rust
+    - Gnu toolchain also works but isnt recommended
 - sqlite3
 - MongoDB server
 - A Discord bot
@@ -20,7 +23,7 @@
 
 ### How to add a command
 - Add a file ending with `_command` in `src/commands/`
-- Create a function in that file with the sasme name as the file, excluding the `_command`
+- Create a function in that file with the same name as the file, excluding the `_command`
 - Make sure your command include poise macro to define what kind of command it is, and takes a context param
 ```rust
 use crate::{Context, Error};
