@@ -1,8 +1,9 @@
+> [!NOTE]
+> This was developed on windows so you're more on your own if on mac or linux
+
 ### Prerequisites
 - Git
 - Rust
-
--# (note that this was devloped on windows so you're more on your own if on mac or linux)
 - [msvc build tools](https://visualstudio.microsoft.com/downloads/?q=build+tools)
     - You can also use this [gist](https://gist.github.com/mmozeiko/7f3162ec2988e81e56d5c4e22cde9977) if you just need
       the build tools for rust
